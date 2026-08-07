@@ -1,0 +1,11 @@
+{
+  "name": "ar-curtain-tryon",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AR curtain try-on PWA - Vite + React + TS + Tailwind + R3F/Three.js",
+  "scripts": {
+    "dev": "npm --prefix client run dev",
+    "build": "npm --prefix client run build",
+    "preview": "npm --prefix client run preview"
+  }
+}
