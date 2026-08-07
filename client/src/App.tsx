@@ -1,34 +1,40 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { requestCamera, type CameraStatus } from './modules/camera/camera.ts'
 
 export default function App() {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const streamRef = useRef<MediaStream | null>(null)
+  const [stream, setStream] = useState<MediaStream | null>(null)
   const [status, setStatus] = useState<CameraStatus>('idle')
   const [message, setMessage] = useState<string>('')
   const [hint, setHint] = useState<string>('')
 
+  // Attach the stream once the <video> element is in the DOM (after 'granted' renders).
+  useEffect(() => {
+    if (!stream || !videoRef.current) return
+    const video = videoRef.current
+    video.srcObject = stream
+    void video.play().catch(() => undefined)
+    // The Play promise rejection (Autoplay) is benign because stream is muted.
+  }, [stream])
+
+  // Clean up the stream when the component unmounts.
+  useEffect(() => {
+    return () => stream?.getTracks().forEach((t) => t.stop())
+  }, [stream])
+
   async function handleStart() {
     setStatus('requesting')
     setMessage('Requesting camera…')
-    const { result, stream } = await requestCamera()
+    const { result, stream: nextStream } = await requestCamera()
     setStatus(result.status)
     setMessage(result.message)
     setHint(result.hint ?? '')
-
-    if (stream) {
-      streamRef.current = stream
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play().catch(() => undefined)
-      }
-    }
+    setStream(nextStream)
   }
 
   function handleStop() {
-    streamRef.current?.getTracks().forEach((t) => t.stop())
-    streamRef.current = null
-    if (videoRef.current) videoRef.current.srcObject = null
+    stream?.getTracks().forEach((t) => t.stop())
+    setStream(null)
     setStatus('idle')
     setMessage('')
     setHint('')
