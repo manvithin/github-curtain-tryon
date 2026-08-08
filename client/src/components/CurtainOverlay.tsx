@@ -1,8 +1,8 @@
 import { Canvas, useFrame } from '@react-three/fiber'
+import { useEffect } from 'react'
 import { useCurtainModel } from './curtainScene.ts'
 import type { CurtainConfig } from '../modules/curtain/curtainModel.ts'
 import type { PlanePlacement } from '../modules/curtain/placement.ts'
-import { useEffect, useRef } from 'react'
 
 interface CurtainOverlayProps {
   placement: PlanePlacement | null
@@ -11,8 +11,8 @@ interface CurtainOverlayProps {
 
 /**
  * Transparent WebGL overlay that draws the curtain over the live video.
- * The camera is configured to match the phone's estimated vertical FOV so
- * the curtain lands where the user tapped.
+ * The camera matches the phone's estimated vertical FOV so the curtain lands
+ * where the user tapped.
  */
 export default function CurtainOverlay({ placement, config }: CurtainOverlayProps) {
   return (
@@ -30,16 +30,16 @@ export default function CurtainOverlay({ placement, config }: CurtainOverlayProp
 }
 
 function CurtainObject({ placement, config }: { placement: PlanePlacement; config: CurtainConfig }) {
-  const model = useCurtainModel()
-  const modelRef = useRef(model)
-  modelRef.current = model
+  // Seed only with the window geometry so the model is rebuilt exclusively
+  // when the user re-anchors a different window size.
+  const model = useCurtainModel({ width: placement.width, height: placement.height })
 
-  useFrame((_, delta) => {
-    modelRef.current?.update(delta * 1000)
-  })
+  // drive the open/close tween every frame
+  useFrame((_, delta) => model?.update(delta * 1000))
 
   useEffect(() => {
-    model?.set({
+    if (!model) return
+    model.set({
       width: config.width,
       height: config.height,
       open: config.open,
@@ -47,6 +47,7 @@ function CurtainObject({ placement, config }: { placement: PlanePlacement; confi
       color: config.color,
       roughness: config.roughness,
       translucency: config.translucency,
+      placed: true,
     })
   }, [model, config])
 

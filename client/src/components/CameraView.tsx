@@ -5,7 +5,7 @@ import {
   isValidQuad,
   pointsToQuad,
 } from '../modules/window/windowPlane.ts'
-import { draw } from './cameraOverlay.tsx'
+import { draw, type PlaceState } from './cameraOverlay.tsx'
 import type { PlanePlacement } from '../modules/curtain/placement.ts'
 import { computePlacement } from '../modules/curtain/placement.ts'
 import { preloadCurtain } from './curtainScene.ts'
@@ -88,7 +88,8 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
 
     const loop = () => {
       raf = requestAnimationFrame(loop)
-      draw(ctx, overlay, video, stageRef.current)
+      const placeState: PlaceState = stageRef.current.quad ? 'placed' : 'placing'
+      draw(ctx, overlay, video, stageRef.current, placeState)
     }
     raf = requestAnimationFrame(loop)
     return () => {
@@ -170,17 +171,17 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
     : 'Window placed — curtains anchored here.'
 
   return (
-    <div
+       <div
       ref={wrapRef}
       onPointerDown={hasQuad ? undefined : handlePointerDown}
-      className="relative h-svh w-full overflow-hidden bg-black select-none"
+      className="relative h-svh w-full overflow-hidden select-none"
     >
-      <video
+       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
-        className="absolute inset-0 h-full w-full object-cover"
+        className="absolute inset-0 h-full w-full object-cover bg-black"
       />
       <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
 
@@ -197,6 +198,7 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
               color: FABRICS[fabricIdx].color,
               roughness: FABRICS[fabricIdx].roughness,
               translucency: FABRICS[fabricIdx].translucency,
+              placed: true,
             }}
           />
         </Suspense>

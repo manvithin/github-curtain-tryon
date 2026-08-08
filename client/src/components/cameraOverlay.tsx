@@ -6,13 +6,17 @@ interface WindowStage {
   quad: Quad | null
 }
 
+/** Whether the placement is finished (green debug overlay should be hidden). */
+export type PlaceState = 'placing' | 'placed'
+
 const ANCHOR_COLOR = '#22d3ee'
 const LOCK_COLOR = '#34d399'
 
 /**
- * Draw the Stage-1A overlay onto the (DPR-scaled) canvas:
- *  - placement in progress: numbered corner anchors + dashed polygon preview
- *  - placed: glowing four-corner outline + corner dots
+ * Draw the Stage-1A overlay onto the (DPR-scaled) canvas.
+ *  - placing: numbered corner anchors + dashed preview; once 4 corners are set,
+ *    a glowing green outline confirms the detected window.
+ *  - placed:  nothing is drawn; the live curtain takes over.
  * Input corners/quad are video-normalized; we map to container px.
  */
 export function draw(
@@ -20,11 +24,14 @@ export function draw(
   canvas: HTMLCanvasElement,
   video: HTMLVideoElement,
   stage: WindowStage,
+  placeState: PlaceState,
 ): void {
   const cw = canvas.width
   const ch = canvas.height
   ctx.clearRect(0, 0, cw, ch)
   if (video.videoWidth === 0) return
+  // once the curtain is placed, do not draw any debug green over it.
+  if (placeState === 'placed') return
 
   const map = (p: Point): Point => {
     const pt = videoToDisplay(p, cw, ch, video.videoWidth, video.videoHeight)
@@ -36,13 +43,12 @@ export function draw(
     const pts = stage.corners.map(map)
     drawPreview(ctx, pts)
 
-    // next-corner crosshair (the imminent tap point is unknown; draw centers only)
     for (let i = 0; i < pts.length; i++) {
       drawCornerMarker(ctx, pts[i], CORNER_LABELS[i])
     }
   }
 
-  // ---------- locked window ----------
+  // ---------- locked window (before Confirm finishes) ----------
   if (stage.quad) {
     drawLockedQuad(ctx, stage.quad, map)
   }
