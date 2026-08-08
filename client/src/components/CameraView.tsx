@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import type { Point, Quad } from '../modules/window/windowPlane.ts'
 import {
   displayToVideo,
@@ -6,6 +6,10 @@ import {
   pointsToQuad,
 } from '../modules/window/windowPlane.ts'
 import { draw } from './cameraOverlay.tsx'
+import type { PlanePlacement } from '../modules/curtain/placement.ts'
+import { computePlacement } from '../modules/curtain/placement.ts'
+
+const CurtainOverlay = lazy(() => import('./CurtainOverlay.tsx'))
 
 interface WindowStage {
   /** Points tapped so far, in video-normalized coords (0..1). */
@@ -18,6 +22,14 @@ interface CameraViewProps {
   stream: MediaStream
   onExit: () => void
 }
+
+const FABRICS = [
+  { name: 'Linen', color: '#e8e4dc', roughness: 0.92, translucency: 0.08 },
+  { name: 'Sheer', color: '#f4f1eb', roughness: 0.85, translucency: 0.65 },
+  { name: 'Velvet', color: '#7c3aed', roughness: 0.75, translucency: 0 },
+]
+
+const DEFAULT_FABRIC = 0
 
 const PROMPTS = [
   'Tap the top-left corner of the window',
@@ -33,6 +45,9 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
 
   const [stage, setStage] = useState<WindowStage>({ corners: [], quad: null })
   const [error, setError] = useState('')
+  const [placement, setPlacement] = useState<PlanePlacement | null>(null)
+  const [fabricIdx, setFabricIdx] = useState(DEFAULT_FABRIC)
+  const [openRatio, setOpenRatio] = useState(0)
 
   // ---- attach stream ----------------------------------------------------
   useEffect(() => {
@@ -109,12 +124,19 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
       setStage({ corners: [], quad: null })
       return
     }
+    const wrap = wrapRef.current
+    const video = videoRef.current
+    if (wrap && video && video.videoWidth) {
+      const rect = wrap.getBoundingClientRect()
+      setPlacement(computePlacement(quad, rect.width, rect.height, video.videoWidth, video.videoHeight))
+    }
     setStage({ corners: [], quad })
     setError('')
   }, [])
 
   const handleReanchor = useCallback(() => {
     setStage({ corners: [], quad: null })
+    setPlacement(null)
     setError('')
   }, [])
 
@@ -147,6 +169,24 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
       />
       <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
 
+      {/* 3D curtain over the live video */}
+      {placement && (
+        <Suspense fallback={null}>
+          <CurtainOverlay
+            placement={placement}
+            config={{
+              width: placement.width,
+              height: placement.height,
+              open: openRatio,
+              draw: 0.9,
+              color: FABRICS[fabricIdx].color,
+              roughness: FABRICS[fabricIdx].roughness,
+              translucency: FABRICS[fabricIdx].translucency,
+            }}
+          />
+        </Suspense>
+      )}
+
       {/* status pill */}
       <div
         className={`absolute left-1/2 top-6 w-max max-w-[85vw] -translate-x-1/2 rounded-full px-4 py-2 text-center text-xs font-semibold tracking-wide backdrop-blur ${
@@ -160,10 +200,36 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
       {hasQuad && (
         <button
           onClick={handleReanchor}
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-neutral-100 px-5 py-3 text-sm font-semibold text-neutral-900 active:scale-95"
+          className="absolute right-4 bottom-24 flex h-11 w-11 items-center justify-center rounded-full bg-neutral-100 text-neutral-900 active:scale-95"
+          aria-label="Re-anchor"
         >
-          Re-anchor
+          <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 3l-6 6m0 0V5m0 4h4M5 3c-3 3-3 9 0 12l7-7M5 3l7 7" />
+          </svg>
         </button>
+      )}
+
+      {/* 1B minimal controls (curtain placed) */}
+      {hasQuad && (
+        <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-2xl bg-black/55 px-3 py-2 backdrop-blur">
+          <button
+            onClick={() => setOpenRatio((o) => (o === 1 ? 0 : 1))}
+            className="rounded-full bg-white/90 px-4 py-2 text-xs font-semibold text-neutral-900 active:scale-95"
+          >
+            {openRatio === 1 ? 'Close' : 'Open'}
+          </button>
+          {FABRICS.map((f, i) => (
+            <button
+              key={f.name}
+              onClick={() => setFabricIdx(i)}
+              aria-label={f.name}
+              className={`h-9 w-9 rounded-full border-2 transition active:scale-90 ${
+                i === fabricIdx ? 'border-white' : 'border-white/30'
+              }`}
+              style={{ backgroundColor: f.color }}
+            />
+          ))}
+        </div>
       )}
 
       {/* confirm (only while placing, 4 corners ready) */}
