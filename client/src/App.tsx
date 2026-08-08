@@ -43,9 +43,10 @@ export default function App() {
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-neutral-500">
           AR Curtain Try-On
         </p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">Point at a window</h1>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight">Place your curtain</h1>
         <p className="mt-2 text-sm text-neutral-400">
-          Hold your phone steady — the app will find the window and draw a glowing outline around it.
+          Tap the four corners of your window in order — top-left, top-right, bottom-right,
+          bottom-left — and confirm.
         </p>
       </div>
 
@@ -54,14 +55,14 @@ export default function App() {
         disabled={status === 'requesting'}
         className="w-full max-w-xs rounded-full bg-white px-6 py-3.5 text-sm font-semibold text-neutral-950 transition active:scale-[0.98] disabled:opacity-50"
       >
-        {status === 'requesting' ? 'Starting…' : 'Start Window Detection'}
+        {status === 'requesting' ? 'Starting…' : 'Start Placement'}
       </button>
 
       {message && <p className="max-w-xs text-center text-sm text-neutral-300">{message}</p>}
       {hint && <p className="max-w-xs text-center text-xs text-neutral-500">{hint}</p>}
 
       <p className="text-[11px] leading-relaxed text-neutral-600">
-        Phase 2 · On-device geometric window detection · No server, no uploads
+        Stage 1A · Manual four-corner window placement · On-device, no uploads
       </p>
     </main>
   )

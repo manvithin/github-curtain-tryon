@@ -1,68 +1,57 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { detectWindow, resetDetector } from '../modules/detection/detectWindow.ts'
-import type { DetectionResult } from '../modules/detection/detectWindow.ts'
+import type { Point, Quad } from '../modules/window/windowPlane.ts'
+import {
+  displayToVideo,
+  isValidQuad,
+  pointsToQuad,
+} from '../modules/window/windowPlane.ts'
+import { draw } from './cameraOverlay.tsx'
+
+interface WindowStage {
+  /** Points tapped so far, in video-normalized coords (0..1). */
+  corners: Point[]
+  /** The confirmed window object, or null. */
+  quad: Quad | null
+}
 
 interface CameraViewProps {
   stream: MediaStream
   onExit: () => void
 }
 
-const DETECT_INTERVAL_MS = 80 // ~12 Hz detection; rendering stays at 60 FPS
-
-const PHASE_LABEL: Record<DetectionResult['phase'], string> = {
-  none: 'Window not detected',
-  weak: 'Move closer to the window',
-  good: 'Window locked',
-}
-
-const PHASE_COLOR: Record<DetectionResult['phase'], string> = {
-  none: 'rgba(255,255,255,0.85)',
-  weak: 'rgba(251,191,36,0.95)', // amber
-  good: 'rgba(52,211,153,0.95)', // emerald
-}
+const PROMPTS = [
+  'Tap the top-left corner of the window',
+  'Tap the top-right corner',
+  'Tap the bottom-right corner',
+  'Tap the bottom-left corner',
+]
 
 export default function CameraView({ stream, onExit }: CameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const overlayRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
-  const resultRef = useRef<DetectionResult>({
-    phase: 'none',
-    confidence: 0,
-    quad: null,
-    lowLight: false,
-  })
-  const [result, setResult] = useState<DetectionResult>(resultRef.current)
-  const statsRef = useRef({ fps: 0, detectHz: 0 })
 
-  // ---- attach stream to the video element ------------------------------
+  const [stage, setStage] = useState<WindowStage>({ corners: [], quad: null })
+  const [error, setError] = useState('')
+
+  // ---- attach stream ----------------------------------------------------
   useEffect(() => {
     const video = videoRef.current
     if (!video) return
     video.srcObject = stream
     void video.play().catch(() => undefined)
-    resetDetector()
     return () => {
       video.srcObject = null
-      resetDetector()
     }
   }, [stream])
 
-  // ---- main loop: detect + draw overlay --------------------------------
+  // ---- render loop (draws preview + persistent anchor) -------------------
   useEffect(() => {
     let raf = 0
-    let lastDetect = 0
-    let frameCount = 0
-    let lastFpsSample = performance.now()
-    let fps = 0
-    let detectHz = 0
-    let detectSamples = 0
-    let lastHzSample = performance.now()
-
     const overlay = overlayRef.current
     const wrap = wrapRef.current
     const video = videoRef.current
     if (!overlay || !wrap || !video) return
-
     const ctx = overlay.getContext('2d')
     if (!ctx) return
 
@@ -75,44 +64,10 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
     const ro = new ResizeObserver(resize)
     ro.observe(wrap)
 
-    const loop = (now: number) => {
+    const loop = () => {
       raf = requestAnimationFrame(loop)
-      frameCount++
-      if (now - lastFpsSample >= 1000) {
-        fps = Math.round((frameCount * 1000) / (now - lastFpsSample))
-        frameCount = 0
-        lastFpsSample = now
-        statsRef.current.fps = fps
-      }
-      if (now - lastHzSample >= 2000) {
-        detectHz = Math.round((detectSamples * 2000) / (now - lastHzSample))
-        detectSamples = 0
-        lastHzSample = now
-        statsRef.current.detectHz = detectHz
-      }
-
-      // run detection on a cadence, not every frame
-      if (now - lastDetect >= DETECT_INTERVAL_MS) {
-        lastDetect = now
-        detectSamples++
-        resultRef.current = detectWindow(video)
-        // surface state to React only when phase/confidence move meaningfully
-        setResult((prev) => {
-          const next = resultRef.current
-          if (
-            next.phase !== prev.phase ||
-            Math.abs(next.confidence - prev.confidence) > 0.03 ||
-            next.lowLight !== prev.lowLight
-          ) {
-            return next
-          }
-          return prev
-        })
-      }
-
-      drawOverlay(ctx, overlay, video, resultRef.current)
+      draw(ctx, overlay, video, stageRef.current)
     }
-
     raf = requestAnimationFrame(loop)
     return () => {
       cancelAnimationFrame(raf)
@@ -120,15 +75,69 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
     }
   }, [])
 
+  // Keep a ref in sync so the draw loop always sees current state.
+  const stageRef = useRef(stage)
+  stageRef.current = stage
+
+  // ---- pointer handling ---------------------------------------------------
+  const handlePointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const wrap = wrapRef.current
+    const video = videoRef.current
+    if (!wrap || !video || video.videoWidth === 0) return
+
+    // only accept taps while placing (before confirm)
+    if (stageRef.current.quad) return
+
+    const rect = wrap.getBoundingClientRect()
+    const px = e.clientX - rect.left
+    const py = e.clientY - rect.top
+    const pt = displayToVideo(px, py, rect.width, rect.height, video.videoWidth, video.videoHeight)
+    if (!pt) return
+
+    const corners = [...stageRef.current.corners]
+    if (corners.length >= 4) return
+
+    const newCorners = [...corners, pt]
+    setStage({ corners: newCorners, quad: null })
+    setError('')
+  }, [])
+
+  const handleConfirm = useCallback(() => {
+    const quad = pointsToQuad(stageRef.current.corners)
+    if (!quad || !isValidQuad(quad)) {
+      setError('Corners are too small or overlapping — please re-tap them.')
+      setStage({ corners: [], quad: null })
+      return
+    }
+    setStage({ corners: [], quad })
+    setError('')
+  }, [])
+
+  const handleReanchor = useCallback(() => {
+    setStage({ corners: [], quad: null })
+    setError('')
+  }, [])
+
   const handleExit = useCallback(() => {
     stream.getTracks().forEach((t) => t.stop())
     onExit()
   }, [stream, onExit])
 
-  const phase = result.phase
+  const hasQuad = !!stage.quad
+  const prompt = !hasQuad
+    ? stage.corners.length === 0
+      ? PROMPTS[0]
+      : stage.corners.length === 4
+        ? 'All corners placed — press Confirm to place curtains.'
+        : PROMPTS[stage.corners.length]
+    : 'Window placed — curtains anchored here.'
 
   return (
-    <div ref={wrapRef} className="relative h-svh w-full overflow-hidden bg-black">
+    <div
+      ref={wrapRef}
+      onPointerDown={hasQuad ? undefined : handlePointerDown}
+      className="relative h-svh w-full overflow-hidden bg-black select-none"
+    >
       <video
         ref={videoRef}
         autoPlay
@@ -139,25 +148,35 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
       <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
 
       {/* status pill */}
-      {!result.lowLight && (
-        <div
-          className="absolute left-1/2 top-6 -translate-x-1/2 rounded-full px-4 py-2 text-xs font-semibold tracking-wide backdrop-blur"
-          style={{
-            color: PHASE_COLOR[phase],
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            boxShadow: `0 0 18px ${PHASE_COLOR[phase]}66`,
-          }}
+      <div
+        className={`absolute left-1/2 top-6 w-max max-w-[85vw] -translate-x-1/2 rounded-full px-4 py-2 text-center text-xs font-semibold tracking-wide backdrop-blur ${
+          error ? 'bg-red-500/70 text-white' : 'bg-black/55 text-white'
+        }`}
+      >
+        {error || prompt}
+      </div>
+
+      {/* re-anchor (only when a quad exists) */}
+      {hasQuad && (
+        <button
+          onClick={handleReanchor}
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-neutral-100 px-5 py-3 text-sm font-semibold text-neutral-900 active:scale-95"
         >
-          {PHASE_LABEL[phase]}
-        </div>
-      )}
-      {result.lowLight && (
-        <div className="absolute left-1/2 top-6 -translate-x-1/2 rounded-full bg-black/50 px-4 py-2 text-xs font-semibold tracking-wide text-amber-300 backdrop-blur">
-          Low light — move to a brighter spot
-        </div>
+          Re-anchor
+        </button>
       )}
 
-      {/* exit */}
+      {/* confirm (only while placing, 4 corners ready) */}
+      {!hasQuad && stage.corners.length === 4 && (
+        <button
+          onClick={handleConfirm}
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 w-max max-w-[85vw] rounded-full bg-emerald-400 px-5 py-3 text-sm font-semibold text-emerald-950 active:scale-95"
+        >
+          Confirm placement
+        </button>
+      )}
+
+      {/* exit camera */}
       <button
         onClick={handleExit}
         aria-label="Exit camera"
@@ -168,77 +187,11 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
         </svg>
       </button>
 
-      {/* debug HUD (measurement aid — remove before release) */}
-      <div className="pointer-events-none absolute bottom-4 left-4 rounded-lg bg-black/50 px-3 py-2 font-mono text-[10px] leading-relaxed text-emerald-300/80 backdrop-blur">
-        <div>fps {statsRef.current.fps} · detect {statsRef.current.detectHz}Hz</div>
-        <div>conf {(result.confidence * 100).toFixed(0)} · {phase}</div>
-        {result.quad && (
-          <div>
-            tl({(result.quad.tl.x * 100).toFixed(0)},{(result.quad.tl.y * 100).toFixed(0)})
-          </div>
-        )}
-      </div>
+      {!hasQuad && stage.corners.length > 0 && (
+        <p className="absolute bottom-24 left-1/2 -translate-x-1/2 text-[11px] text-white/60">
+          {stage.corners.length}/4 corners placed
+        </p>
+      )}
     </div>
   )
-}
-
-// ---------------------------------------------------------------------------
-// overlay rendering
-// ---------------------------------------------------------------------------
-
-function drawOverlay(
-  ctx: CanvasRenderingContext2D,
-  canvas: HTMLCanvasElement,
-  video: HTMLVideoElement,
-  result: DetectionResult,
-) {
-  const { width: cw, height: ch } = canvas
-  ctx.clearRect(0, 0, cw, ch)
-
-  const show = result.phase === 'good' || (result.phase === 'weak' && !!result.quad)
-  if (!show || !result.quad || video.videoWidth === 0) return
-
-  // map normalized video coords -> display coords accounting for object-cover crop
-  const vw = video.videoWidth
-  const vh = video.videoHeight
-  const scale = Math.max(cw / vw, ch / vh)
-  const dw = vw * scale
-  const dh = vh * scale
-  const ox = (cw - dw) / 2
-  const oy = (ch - dh) / 2
-
-  const map = (nx: number, ny: number) => ({
-    x: ox + nx * dw,
-    y: oy + ny * dh,
-  })
-
-  const tl = map(result.quad.tl.x, result.quad.tl.y)
-  const tr = map(result.quad.tr.x, result.quad.tr.y)
-  const br = map(result.quad.br.x, result.quad.br.y)
-  const bl = map(result.quad.bl.x, result.quad.bl.y)
-
-  const color = PHASE_COLOR[result.phase]
-
-  // glowing stroke
-  ctx.save()
-  ctx.shadowColor = color
-  ctx.shadowBlur = 18
-  ctx.strokeStyle = color
-  ctx.lineWidth = 3
-  ctx.beginPath()
-  ctx.moveTo(tl.x, tl.y)
-  ctx.lineTo(tr.x, tr.y)
-  ctx.lineTo(br.x, br.y)
-  ctx.lineTo(bl.x, bl.y)
-  ctx.closePath()
-  ctx.stroke()
-  ctx.restore()
-
-  // corner markers
-  ctx.fillStyle = color
-  for (const p of [tl, tr, br, bl]) {
-    ctx.beginPath()
-    ctx.arc(p.x, p.y, 5, 0, Math.PI * 2)
-    ctx.fill()
-  }
 }
