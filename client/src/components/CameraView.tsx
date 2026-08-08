@@ -193,7 +193,7 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
         autoPlay
         playsInline
         muted
-        className="absolute inset-0 h-full w-full object-cover bg-black"
+        className="absolute inset-0 h-full w-full object-cover bg-black pointer-events-none"
       />
       <canvas ref={overlayRef} className="pointer-events-none absolute inset-0 h-full w-full" />
 
