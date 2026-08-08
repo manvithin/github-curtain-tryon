@@ -8,6 +8,7 @@ import {
 import { draw } from './cameraOverlay.tsx'
 import type { PlanePlacement } from '../modules/curtain/placement.ts'
 import { computePlacement } from '../modules/curtain/placement.ts'
+import { preloadCurtain } from './curtainScene.ts'
 
 const CurtainOverlay = lazy(() => import('./CurtainOverlay.tsx'))
 
@@ -38,6 +39,8 @@ const PROMPTS = [
   'Tap the bottom-left corner',
 ]
 
+const UNDO_HINT = ' — Undo removes only the last point.'
+
 export default function CameraView({ stream, onExit }: CameraViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const overlayRef = useRef<HTMLCanvasElement>(null)
@@ -55,6 +58,10 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
     if (!video) return
     video.srcObject = stream
     void video.play().catch(() => undefined)
+
+    // Preload the GLB while the user places corners so the overlay is instant.
+    preloadCurtain()
+
     return () => {
       video.srcObject = null
     }
@@ -117,6 +124,14 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
     setError('')
   }, [])
 
+  const handleUndo = useCallback(() => {
+    const corners = [...stageRef.current.corners]
+    if (corners.length === 0) return
+    corners.pop() // point-by-point undo: only the most recent corner
+    setStage({ corners, quad: null })
+    setError('')
+  }, [])
+
   const handleConfirm = useCallback(() => {
     const quad = pointsToQuad(stageRef.current.corners)
     if (!quad || !isValidQuad(quad)) {
@@ -151,7 +166,7 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
       ? PROMPTS[0]
       : stage.corners.length === 4
         ? 'All corners placed — press Confirm to place curtains.'
-        : PROMPTS[stage.corners.length]
+        : PROMPTS[stage.corners.length] + UNDO_HINT
     : 'Window placed — curtains anchored here.'
 
   return (
@@ -234,11 +249,29 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
 
       {/* confirm (only while placing, 4 corners ready) */}
       {!hasQuad && stage.corners.length === 4 && (
+        <div className="absolute bottom-4 left-1/2 flex w-max max-w-[85vw] -translate-x-1/2 items-center gap-2">
+          <button
+            onClick={handleUndo}
+            className="rounded-full bg-white/80 px-4 py-3 text-sm font-semibold text-neutral-900 backdrop-blur active:scale-95"
+          >
+            Undo
+          </button>
+          <button
+            onClick={handleConfirm}
+            className="rounded-full bg-emerald-400 px-6 py-3 text-sm font-semibold text-emerald-950 active:scale-95"
+          >
+            Confirm placement
+          </button>
+        </div>
+      )}
+
+      {/* undo (only while placing, 1-3 corners) */}
+      {!hasQuad && stage.corners.length > 0 && stage.corners.length < 4 && (
         <button
-          onClick={handleConfirm}
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 w-max max-w-[85vw] rounded-full bg-emerald-400 px-5 py-3 text-sm font-semibold text-emerald-950 active:scale-95"
+          onClick={handleUndo}
+          className="absolute bottom-4 right-4 rounded-full bg-white/80 px-4 py-3 text-sm font-semibold text-neutral-900 backdrop-blur active:scale-95"
         >
-          Confirm placement
+          Undo
         </button>
       )}
 

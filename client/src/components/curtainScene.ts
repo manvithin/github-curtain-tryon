@@ -21,6 +21,14 @@ export function useCurtainModel(): CurtainModel | null {
 export type { CurtainConfig }
 
 /**
+ * Preload the curtain GLB while the user is still placing corners so the
+ * draw/load is instant the moment the window quad is confirmed (<500ms).
+ */
+export function preloadCurtain(): void {
+  useLoader.preload(GLTFLoader, '/models/curtain.glb')
+}
+
+/**
  * A lightweight hook to update the model imperatively without gaps.
  * We keep it minimal: callers invoke modelRef.current?.set(config).
  */

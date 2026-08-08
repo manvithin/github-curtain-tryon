@@ -1,8 +1,8 @@
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useFrame } from '@react-three/fiber'
 import { useCurtainModel } from './curtainScene.ts'
 import type { CurtainConfig } from '../modules/curtain/curtainModel.ts'
 import type { PlanePlacement } from '../modules/curtain/placement.ts'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 interface CurtainOverlayProps {
   placement: PlanePlacement | null
@@ -31,6 +31,12 @@ export default function CurtainOverlay({ placement, config }: CurtainOverlayProp
 
 function CurtainObject({ placement, config }: { placement: PlanePlacement; config: CurtainConfig }) {
   const model = useCurtainModel()
+  const modelRef = useRef(model)
+  modelRef.current = model
+
+  useFrame((_, delta) => {
+    modelRef.current?.update(delta * 1000)
+  })
 
   useEffect(() => {
     model?.set({
