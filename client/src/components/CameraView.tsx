@@ -187,6 +187,7 @@ export default function CameraView({ stream, onExit }: CameraViewProps) {
       ref={wrapRef}
       onPointerDown={handleBackdropPointerDown}
       className="relative h-svh w-full overflow-hidden select-none"
+      style={{ height: '100vh' }}
     >
       <video
         ref={videoRef}
