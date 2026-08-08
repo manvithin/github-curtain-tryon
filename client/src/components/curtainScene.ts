@@ -1,35 +1,34 @@
 import { useMemo } from 'react'
 import { useLoader } from '@react-three/fiber'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
-import { CurtainModel, type CurtainConfig } from '../modules/curtain/curtainModel.ts'
-
-interface CurtainSeed {
-  /** Window span the curtain must fill — set once at placement, never rehydrated. */
-  width: number
-  height: number
-}
+import { CurtainModel, type CurtainConfig, type QuadPoints } from '../modules/curtain/curtainModel.ts'
 
 /**
  * Loads the single curtain GLB once and wraps it in a CurtainModel.
- * `seed.width/height` (the selected window size) hydrates scale at construction
- * so the curtain never flashes at the asset's default size. The model is only
- * rebuilt when the window geometry itself changes, not on open/color updates.
+ * `seedPoints` hydrates the curtain's deformation target at construction so
+ * the curtain renders at the selected quadrilateral immediately (no flash).
  *
- * The GLB is fetched via useLoader.preload while the camera is active (see
- * CameraView), so by the time the user confirms a window this is cached.
+ * The model is rebuilt only when the four window corners change (i.e. a new
+ * window is selected), never on open/color/fabric updates — those go through
+ * model.set() and the frame loop.
+ *
+ * The GLB is preloaded by CameraView (preloadCurtain) while the user places
+ * corners, so the asset is cached by the time Confirm fires.
  */
-export function useCurtainModel(seed: CurtainSeed): CurtainModel | null {
+export function useCurtainModel(seedPoints: QuadPoints): CurtainModel | null {
   const gltf = useLoader(GLTFLoader, '/models/curtain.glb')
   return useMemo(() => {
     if (!gltf.scene) return null
     const clone = gltf.scene.clone(true)
-    const model = new CurtainModel(clone, { width: seed.width, height: seed.height, placed: true })
+    const model = new CurtainModel(clone)
+    model.set({ points: seedPoints })
     return model
-  }, [gltf, seed.width, seed.height])
+  }, [gltf, seedPoints])
 }
 
 export type { CurtainConfig }
 
+/** Fetch+cache the curtain GLB while the camera is active (before Confirm). */
 export function preloadCurtain(): void {
   useLoader.preload(GLTFLoader, '/models/curtain.glb')
 }

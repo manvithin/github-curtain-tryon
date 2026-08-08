@@ -7,7 +7,7 @@ interface WindowStage {
 }
 
 /** Whether the placement is finished (green debug overlay should be hidden). */
-export type PlaceState = 'placing' | 'placed'
+export type PlaceState = 'placing' | 'confirmed'
 
 const ANCHOR_COLOR = '#22d3ee'
 const LOCK_COLOR = '#34d399'
@@ -31,7 +31,7 @@ export function draw(
   ctx.clearRect(0, 0, cw, ch)
   if (video.videoWidth === 0) return
   // once the curtain is placed, do not draw any debug green over it.
-  if (placeState === 'placed') return
+  if (placeState === 'confirmed') return
 
   const map = (p: Point): Point => {
     const pt = videoToDisplay(p, cw, ch, video.videoWidth, video.videoHeight)
