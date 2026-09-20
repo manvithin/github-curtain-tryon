@@ -151,18 +151,23 @@ router.post('/', upload.single('fabric'), async (req, res) => {
     const repeatX = parseFloat(req.body.repeatX) || 4;
     const repeatY = parseFloat(req.body.repeatY) || 4;
 
-    // Process with Sharp keeping texture weave sharpness and high visual fidelity
-    const pipeline = sharp(req.file.buffer)
-      .rotate()
-      .resize({
-        width: 2048,
-        height: 2048,
-        fit: 'inside',
-        withoutEnlargement: true
-      })
-      .webp({ quality: 92, effort: 4 });
-
-    const processedBuffer = await pipeline.toBuffer();
+    let processedBuffer;
+    try {
+      // Process with Sharp keeping texture weave sharpness and high visual fidelity
+      processedBuffer = await sharp(req.file.buffer)
+        .rotate()
+        .resize({
+          width: 2048,
+          height: 2048,
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        .webp({ quality: 92, effort: 4 })
+        .toBuffer();
+    } catch (sharpErr) {
+      console.warn('[Fabric Upload] Sharp processing failed, saving raw file buffer:', sharpErr);
+      processedBuffer = req.file.buffer;
+    }
 
     const timestamp = Date.now();
     const randomId = Math.random().toString(36).substring(2, 7);
