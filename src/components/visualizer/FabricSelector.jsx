@@ -1,12 +1,30 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Plus, Check, Trash2, Sliders, Loader2, MoreVertical, X } from 'lucide-react';
 import { useVisualizerStore } from '../../store/visualizerStore.js';
+import { processFabricImage } from '../../utils/imageUtils.js';
+
+const LOCAL_CUSTOM_FABRICS_KEY = 'custom_fabrics_v1';
+
+function getStoredCustomFabrics() {
+  try {
+    const raw = localStorage.getItem(LOCAL_CUSTOM_FABRICS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveStoredCustomFabrics(list) {
+  try {
+    localStorage.setItem(LOCAL_CUSTOM_FABRICS_KEY, JSON.stringify(list));
+  } catch (e) {}
+}
 
 export function FabricSelector() {
   const fileInputRef = useRef(null);
   const touchTimerRef = useRef(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [menuFabric, setMenuFabric] = useState(null); // Fabric object currently targeted by 3-dots / long-press menu
+  const [menuFabric, setMenuFabric] = useState(null); // Fabric object for 3-dots / long-press options modal
 
   const fabrics = useVisualizerStore((state) => state.fabrics);
   const setFabrics = useVisualizerStore((state) => state.setFabrics);
@@ -14,31 +32,43 @@ export function FabricSelector() {
   const setSelectedFabric = useVisualizerStore((state) => state.setSelectedFabric);
   const showToast = useVisualizerStore((state) => state.showToast);
 
-  // Fetch fabric catalog on mount if empty
+  // Fetch catalog on mount and merge with local custom fabrics
   useEffect(() => {
-    async function fetchFabrics() {
+    async function loadCatalog() {
+      let catalog = [];
       try {
         const res = await fetch('/api/fabrics');
         if (res.ok) {
           const json = await res.json();
           if (json.success && Array.isArray(json.data)) {
-            setFabrics(json.data);
-            if (!selectedFabric && json.data.length > 0) {
-              setSelectedFabric(json.data[0]);
-            }
+            catalog = json.data;
           }
         }
       } catch (err) {
-        console.warn('Could not fetch fabrics from backend:', err);
+        console.warn('Backend fabrics fetch fallback to local:', err);
+      }
+
+      // Merge local custom fabrics stored in browser
+      const localCustoms = getStoredCustomFabrics();
+      const mergedMap = new Map();
+      catalog.forEach((f) => mergedMap.set(f.id, f));
+      localCustoms.forEach((f) => mergedMap.set(f.id, f));
+
+      const finalFabrics = Array.from(mergedMap.values());
+      if (finalFabrics.length > 0) {
+        setFabrics(finalFabrics);
+        if (!selectedFabric) {
+          setSelectedFabric(finalFabrics[0]);
+        }
       }
     }
 
     if (fabrics.length === 0) {
-      fetchFabrics();
+      loadCatalog();
     }
   }, [fabrics.length, selectedFabric, setFabrics, setSelectedFabric]);
 
-  // Handle uploading custom fabric
+  // Upload Custom Fabric using instant in-browser processing
   const handleUploadFabric = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -51,78 +81,86 @@ export function FabricSelector() {
     setIsUploading(true);
 
     try {
-      const formData = new FormData();
-      formData.append('fabric', file);
-      formData.append('name', file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '));
-      formData.append('repeatX', '1');
-      formData.append('repeatY', '1');
+      // 1. Process image on client-side (instant & reliable across all cloud hosts)
+      const dataUrl = await processFabricImage(file);
 
-      const res = await fetch('/api/fabrics', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
-          const newFabric = json.data;
-          setFabrics([...fabrics, newFabric]);
-          setSelectedFabric(newFabric);
-          showToast(`Custom fabric "${newFabric.name}" added!`, 'success');
-          return;
-        }
-      }
-
-      // Fallback: Local object URL if backend is unreachable or offline
-      const localUrl = URL.createObjectURL(file);
-      const fallbackFabric = {
-        id: `custom-local-${Date.now()}`,
-        name: file.name.split('.')[0] || 'Custom Fabric',
-        imageUrl: localUrl,
-        thumbnailUrl: localUrl,
+      const fabricName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ') || 'Custom Fabric';
+      const newFabric = {
+        id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        name: fabricName,
+        imageUrl: dataUrl,
+        thumbnailUrl: dataUrl,
         repeatX: 1,
         repeatY: 1,
-        isCustom: true
+        isCustom: true,
+        category: 'Custom'
       };
-      setFabrics([...fabrics, fallbackFabric]);
-      setSelectedFabric(fallbackFabric);
-      showToast('Custom fabric added!', 'success');
+
+      // 2. Update React State & Store
+      const updatedList = [...fabrics, newFabric];
+      setFabrics(updatedList);
+      setSelectedFabric(newFabric);
+
+      // 3. Save to LocalStorage for persistence
+      const localCustoms = getStoredCustomFabrics();
+      localCustoms.push(newFabric);
+      saveStoredCustomFabrics(localCustoms);
+
+      showToast(`Custom fabric "${newFabric.name}" applied!`, 'success');
+
+      // 4. Background sync with backend if server is active
+      try {
+        const formData = new FormData();
+        formData.append('fabric', file);
+        formData.append('name', fabricName);
+        formData.append('repeatX', '1');
+        formData.append('repeatY', '1');
+        fetch('/api/fabrics', { method: 'POST', body: formData }).catch(() => {});
+      } catch (err) {}
     } catch (err) {
-      console.error('Fabric upload error:', err);
-      showToast('Failed to process fabric image.', 'error');
+      console.error('Fabric processing error:', err);
+      showToast('Failed to process fabric image format.', 'error');
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
-  // Handle deleting a fabric
-  const handleDeleteFabric = async (fabricToDelete) => {
-    if (!fabricToDelete) return;
+  // Delete fabric handler
+  const handleDeleteFabric = async (targetFabric) => {
+    if (!targetFabric) return;
     setMenuFabric(null);
 
     try {
-      if (fabricToDelete.isCustom) {
-        await fetch(`/api/fabrics/${fabricToDelete.id}`, { method: 'DELETE' }).catch(() => {});
-      }
-
-      const updated = fabrics.filter((f) => f.id !== fabricToDelete.id);
+      // Remove from store
+      const updated = fabrics.filter((f) => f.id !== targetFabric.id);
       setFabrics(updated);
 
-      if (selectedFabric?.id === fabricToDelete.id) {
+      // Remove from local storage if custom
+      const localCustoms = getStoredCustomFabrics().filter((f) => f.id !== targetFabric.id);
+      saveStoredCustomFabrics(localCustoms);
+
+      // Backend sync
+      if (targetFabric.isCustom) {
+        fetch(`/api/fabrics/${targetFabric.id}`, { method: 'DELETE' }).catch(() => {});
+      }
+
+      // Switch selection if active fabric was deleted
+      if (selectedFabric?.id === targetFabric.id) {
         setSelectedFabric(updated[0] || null);
       }
-      showToast(`Fabric "${fabricToDelete.name}" deleted.`, 'info');
+
+      showToast(`Fabric "${targetFabric.name}" deleted`, 'info');
     } catch (err) {
       showToast('Could not delete fabric', 'error');
     }
   };
 
-  // Long press handler for touch devices
+  // Touch long press handlers
   const handleTouchStart = (fabric) => {
     touchTimerRef.current = setTimeout(() => {
       setMenuFabric(fabric);
-    }, 500); // 500ms long press threshold
+    }, 450);
   };
 
   const handleTouchEnd = () => {
@@ -132,6 +170,7 @@ export function FabricSelector() {
     }
   };
 
+  // Update repeat
   const handleUpdateRepeat = (axis, value) => {
     if (!selectedFabric) return;
     const num = Math.max(1, Math.min(12, parseInt(value, 10) || 1));
@@ -145,7 +184,7 @@ export function FabricSelector() {
 
   return (
     <div className="flex flex-col gap-4 select-none">
-      {/* Hidden file input */}
+      {/* Hidden upload input */}
       <input
         ref={fileInputRef}
         type="file"
@@ -154,7 +193,7 @@ export function FabricSelector() {
         onChange={handleUploadFabric}
       />
 
-      {/* Fabric Swatches Horizontal Scroll */}
+      {/* Fabric Swatches Row */}
       <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-none touch-pan-x">
         {/* Upload Custom Fabric Button */}
         <button
@@ -206,7 +245,7 @@ export function FabricSelector() {
                   </div>
                 )}
 
-                {/* 3-Dots Menu Button */}
+                {/* 3-Dots Button */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -214,7 +253,7 @@ export function FabricSelector() {
                   }}
                   title="Fabric Options"
                   style={{ touchAction: 'manipulation' }}
-                  className="absolute top-1 right-1 p-1 rounded-full bg-black/50 text-white hover:bg-neutral-900 opacity-80 group-hover:opacity-100 transition active:scale-90"
+                  className="absolute top-1 right-1 p-1 rounded-full bg-black/60 text-white hover:bg-neutral-900 transition active:scale-90 z-10"
                 >
                   <MoreVertical size={13} />
                 </button>
@@ -228,7 +267,7 @@ export function FabricSelector() {
         })}
       </div>
 
-      {/* Pattern Repeat / Tiling Controls — always visible */}
+      {/* Pattern Tiling Controls */}
       {selectedFabric && (
         <div className="border-t border-neutral-100 pt-3">
           <p className="flex items-center gap-1.5 text-xs font-semibold text-neutral-700 mb-2.5">
@@ -271,7 +310,7 @@ export function FabricSelector() {
         </div>
       )}
 
-      {/* ── 3-Dots / Long-Press Fabric Options Action Modal ── */}
+      {/* ── 3-Dots / Long-Press Fabric Options Modal ── */}
       {menuFabric && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200"
@@ -281,10 +320,10 @@ export function FabricSelector() {
             className="w-full max-w-xs bg-white rounded-3xl p-5 shadow-2xl border border-neutral-100 flex flex-col gap-4 animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
+            {/* Header */}
             <div className="flex items-center justify-between pb-2 border-b border-neutral-100">
               <div className="flex items-center gap-2.5 overflow-hidden">
-                <div className="w-8 h-8 rounded-lg overflow-hidden shrink-0 border border-neutral-200">
+                <div className="w-9 h-9 rounded-xl overflow-hidden shrink-0 border border-neutral-200 shadow-xs">
                   <img
                     src={menuFabric.thumbnailUrl || menuFabric.imageUrl}
                     alt={menuFabric.name}
@@ -303,7 +342,7 @@ export function FabricSelector() {
               </button>
             </div>
 
-            {/* Actions */}
+            {/* Options */}
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => handleDeleteFabric(menuFabric)}
