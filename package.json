@@ -7,10 +7,14 @@
     "client": "vite",
     "server": "node server/index.js",
     "build": "vite build",
+    "cap:build": "npm run build && npx cap sync android",
+    "cap:open": "npx cap open android",
     "preview": "vite preview",
     "start": "node server/index.js"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
     "@react-three/drei": "^9.109.0",
     "@react-three/fiber": "^8.16.8",
     "cors": "^2.8.5",
@@ -27,6 +31,7 @@
     "zustand": "^4.5.4"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.6.1",
