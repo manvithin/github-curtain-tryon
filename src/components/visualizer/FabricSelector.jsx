@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Plus, Check, Trash2, Sliders, Loader2, MoreVertical, X } from 'lucide-react';
 import { useVisualizerStore } from '../../store/visualizerStore.js';
 import { processFabricImage } from '../../utils/imageUtils.js';
+import { BUILTIN_FABRICS } from '../../config/curtainConfig.js';
 
 const LOCAL_CUSTOM_FABRICS_KEY = 'custom_fabrics_v1';
 
@@ -35,17 +36,19 @@ export function FabricSelector() {
   // Fetch catalog on mount and merge with local custom fabrics
   useEffect(() => {
     async function loadCatalog() {
-      let catalog = [];
+      // Start with built-in fabrics as guaranteed base catalog
+      let catalog = [...BUILTIN_FABRICS];
+
       try {
         const res = await fetch('/api/fabrics');
         if (res.ok) {
           const json = await res.json();
-          if (json.success && Array.isArray(json.data)) {
+          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
             catalog = json.data;
           }
         }
       } catch (err) {
-        console.warn('Backend fabrics fetch fallback to local:', err);
+        console.warn('Backend fabrics fetch fallback to built-in list:', err);
       }
 
       // Merge local custom fabrics stored in browser
@@ -200,7 +203,7 @@ export function FabricSelector() {
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading}
           style={{ touchAction: 'manipulation' }}
-          className="shrink-0 flex flex-col items-center justify-center w-20 h-22 rounded-2xl border-2 border-dashed border-neutral-300 hover:border-neutral-900 bg-neutral-50 hover:bg-neutral-100 transition active:scale-95 text-neutral-600 hover:text-neutral-900 disabled:opacity-50"
+          className="shrink-0 flex flex-col items-center justify-center w-20 h-22 rounded-2xl border-2 border-dashed border-neutral-300 hover:border-neutral-900 bg-neutral-50 hover:bg-neutral-100 transition duration-150 active:scale-95 text-neutral-600 hover:text-neutral-900 disabled:opacity-50"
         >
           {isUploading ? (
             <Loader2 size={20} className="animate-spin text-neutral-800" />
@@ -223,11 +226,11 @@ export function FabricSelector() {
               onTouchEnd={handleTouchEnd}
               onTouchMove={handleTouchEnd}
               onClick={() => setSelectedFabric(fabric)}
-              className="group relative shrink-0 flex flex-col items-center w-20 cursor-pointer active:scale-95 transition-all"
+              className="group relative shrink-0 flex flex-col items-center w-20 cursor-pointer active:scale-95 transition-all duration-150"
             >
               <div
-                className={`relative w-20 h-20 rounded-2xl overflow-hidden shadow-xs border-2 transition ${
-                  isSelected ? 'border-neutral-950 ring-2 ring-neutral-950/20' : 'border-neutral-200 hover:border-neutral-400'
+                className={`relative w-20 h-20 rounded-2xl overflow-hidden shadow-xs border-2 transition duration-200 ${
+                  isSelected ? 'border-neutral-950 ring-2 ring-neutral-950/20 scale-102' : 'border-neutral-200 hover:border-neutral-400'
                 }`}
               >
                 <img

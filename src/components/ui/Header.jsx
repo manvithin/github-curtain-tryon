@@ -28,42 +28,55 @@ export function Header() {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-30 h-14 bg-white/90 backdrop-blur-md border-b border-neutral-200 px-4 flex items-center justify-between shadow-xs select-none">
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setStep('upload')}
-          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 transition active:scale-95 text-sm font-medium"
-          title="Change Room Photo"
-        >
-          <ArrowLeft size={18} />
-          <span className="hidden sm:inline">Change Photo</span>
-        </button>
-        <span className="text-neutral-300">|</span>
-        <div className="flex items-center gap-1.5">
-          <Sparkles size={16} className="text-amber-600" />
-          <h1 className="text-sm font-semibold text-neutral-900 tracking-tight">Curtain Studio</h1>
+    <header className="fixed top-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-b border-neutral-200/80 shadow-xs select-none transition-all">
+      {/* ── Status Bar Grace Space with Studio Name Banner ── */}
+      <div className="w-full flex items-center justify-center pt-[max(env(safe-area-inset-top,0px),8px)] pb-1 px-4 bg-neutral-900 text-white">
+        <div className="flex items-center gap-1.5 py-0.5 opacity-95">
+          <Sparkles size={12} className="text-amber-400 shrink-0" />
+          <span className="text-[10px] sm:text-xs font-bold tracking-[0.18em] uppercase text-neutral-100 font-mono">
+            RUAM CURTAIN VISUALIZER
+          </span>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
+      {/* ── Action Navigation Row (Comfortably below phone status bar) ── */}
+      <div className="h-13 sm:h-14 px-3 sm:px-5 flex items-center justify-between">
+        {/* Left: Change Room Photo Button */}
         <button
-          onClick={() => {
-            resetCurtainTransform();
-            showToast('Curtain reset to default position & scale', 'info', 2000);
-          }}
-          className="p-2 rounded-lg text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition active:scale-95"
-          title="Reset position & size"
+          onClick={() => setStep('upload')}
+          style={{ touchAction: 'manipulation' }}
+          className="flex items-center gap-1.5 py-2 px-3 rounded-xl text-neutral-700 hover:text-neutral-900 hover:bg-neutral-100 active:bg-neutral-200/70 transition duration-150 active:scale-95 text-xs sm:text-sm font-semibold min-h-[44px]"
+          title="Change Room Photo"
         >
-          <RotateCcw size={18} />
+          <ArrowLeft size={18} className="text-neutral-800" />
+          <span>Change Photo</span>
         </button>
 
-        <button
-          onClick={handleExport}
-          className="flex items-center gap-1.5 bg-neutral-900 hover:bg-black text-white px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition shadow-xs active:scale-95"
-        >
-          <Download size={15} />
-          <span>Save Preview</span>
-        </button>
+        {/* Right: Reset & Export Actions */}
+        <div className="flex items-center gap-2">
+          {/* Reset Curtain Button */}
+          <button
+            onClick={() => {
+              resetCurtainTransform();
+              showToast('Curtain reset to center', 'info', 2000);
+            }}
+            style={{ touchAction: 'manipulation' }}
+            className="p-2.5 rounded-xl text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 active:bg-neutral-200 transition duration-150 active:scale-95 min-h-[44px] min-w-[44px] flex items-center justify-center"
+            title="Reset position & size"
+          >
+            <RotateCcw size={18} />
+          </button>
+
+          {/* Save / Export Preview Button */}
+          <button
+            onClick={handleExport}
+            style={{ touchAction: 'manipulation' }}
+            className="flex items-center gap-1.5 bg-neutral-900 hover:bg-black active:bg-neutral-800 text-white px-3.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-medium transition duration-150 shadow-xs active:scale-95 min-h-[44px]"
+          >
+            <Download size={15} className="text-neutral-200" />
+            <span>Save Preview</span>
+          </button>
+        </div>
       </div>
     </header>
   );

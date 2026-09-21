@@ -22,20 +22,20 @@ function CanvasLoader() {
 export function Visualizer() {
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-neutral-900 flex flex-col select-none">
-      {/* Top Header */}
+      {/* Top Header with Status Bar Grace Area & Action Row */}
       <Header />
 
-      {/* ── Body below header ── */}
-      <div className="flex-1 relative mt-14 overflow-hidden flex flex-col sm:flex-row">
+      {/* ── Main Viewport below header ── */}
+      <div className="flex-1 relative mt-[calc(max(env(safe-area-inset-top,0px),8px)+56px)] overflow-hidden flex flex-col sm:flex-row">
 
         {/* ── DESKTOP: right sidebar ── */}
         <div className="hidden sm:flex sm:flex-col sm:w-96 sm:h-full sm:border-l sm:border-neutral-200/80 bg-white z-20 order-last">
           <CurtainControls />
         </div>
 
-        {/* ── 3D Viewport (fills ALL remaining space, background behind the sheet on mobile) ── */}
-        <div className="relative flex-1 w-full h-full">
-          {/* Room Background Photo — fills entire viewport area */}
+        {/* ── 3D Viewport (fills full area) ── */}
+        <div className="relative flex-1 w-full h-full overflow-hidden">
+          {/* Room Background Photo */}
           <Background />
 
           {/* Transparent WebGL Canvas Overlay */}
@@ -61,7 +61,7 @@ export function Visualizer() {
             </Suspense>
           </div>
 
-          {/* ── MOBILE: floating bottom sheet anchored to bottom of the viewport ── */}
+          {/* ── MOBILE: floating bottom sheet anchored to bottom of viewport ── */}
           <div className="sm:hidden absolute bottom-0 left-0 right-0 z-20">
             <CurtainControls />
           </div>

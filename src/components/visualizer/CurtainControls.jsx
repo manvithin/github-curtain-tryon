@@ -30,7 +30,7 @@ function SliderRow({ label, value, min, max, step, onChange, unit = '', display 
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
         style={{ touchAction: 'pan-x' }}
-        className="w-full h-2 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-neutral-900"
+        className="w-full h-2 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-neutral-900 transition-opacity"
       />
       <div className="flex justify-between text-[10px] text-neutral-400 mt-0.5">
         <span>{min}{unit}</span>
@@ -53,28 +53,30 @@ export function CurtainControls() {
   return (
     <div
       className={`
-        bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl border border-neutral-200/80
-        flex flex-col z-20 transition-transform duration-300 ease-in-out
-        sm:translate-y-0
-        ${isSheetCollapsed ? 'translate-y-[calc(100%-96px)]' : 'translate-y-0'}
+        bg-white rounded-t-3xl sm:rounded-2xl shadow-[0_-8px_30px_rgba(0,0,0,0.14)] border border-neutral-200/80
+        flex flex-col z-20 transition-all duration-350 ease-[cubic-bezier(0.32,0.72,0,1)]
+        sm:translate-y-0 sm:shadow-none sm:border-none
+        ${isSheetCollapsed ? 'translate-y-[calc(100%-98px)]' : 'translate-y-0'}
       `}
     >
-      {/* ── Drag handle (mobile only) — always visible ─────────────────── */}
+      {/* ── Drag handle (mobile only) — smooth tap to expand/collapse ─────────────────── */}
       <div
         onClick={toggleSheetCollapsed}
-        className="sm:hidden w-full flex flex-col items-center pt-2.5 pb-1 cursor-pointer shrink-0"
+        className="sm:hidden w-full flex flex-col items-center pt-2.5 pb-1 cursor-pointer shrink-0 active:opacity-70 transition-opacity"
         style={{ touchAction: 'manipulation' }}
       >
-        <div className="w-10 h-1 bg-neutral-300 rounded-full mb-1.5" />
-        {isSheetCollapsed ? (
-          <ChevronUp size={16} className="text-neutral-400" />
-        ) : (
-          <ChevronDown size={16} className="text-neutral-400" />
-        )}
+        <div className="w-11 h-1.5 bg-neutral-300 rounded-full mb-1 transition-all" />
+        <div className="text-neutral-400 py-0.5 transition-transform duration-200">
+          {isSheetCollapsed ? (
+            <ChevronUp size={16} className="animate-bounce-subtle" />
+          ) : (
+            <ChevronDown size={16} />
+          )}
+        </div>
       </div>
 
       {/* ── Tab Bar — always visible (the "peek" strip when collapsed) ────── */}
-      <div className="flex border-b border-neutral-100 px-2 shrink-0">
+      <div className="flex border-b border-neutral-100 px-2 shrink-0 bg-white">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -86,13 +88,13 @@ export function CurtainControls() {
                 setActiveTab(tab.id);
               }}
               style={{ touchAction: 'manipulation' }}
-              className={`flex-1 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-2.5 text-[10px] sm:text-sm font-semibold transition border-b-2 -mb-[1px] min-h-[44px] ${
+              className={`flex-1 flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-1.5 py-2.5 text-[10px] sm:text-xs font-semibold transition-all duration-200 border-b-2 -mb-[1px] min-h-[44px] active:scale-95 ${
                 isActive
-                  ? 'border-neutral-900 text-neutral-900'
+                  ? 'border-neutral-900 text-neutral-900 font-bold'
                   : 'border-transparent text-neutral-500 hover:text-neutral-800'
               }`}
             >
-              <Icon size={16} />
+              <Icon size={16} className={isActive ? 'text-neutral-900 scale-105 transition-transform' : 'text-neutral-400'} />
               <span>{tab.label}</span>
             </button>
           );
@@ -105,8 +107,8 @@ export function CurtainControls() {
           touch-action:pan-y lets the browser scroll without fighting R3F.
       ─────────────────────────────────────────────────────────────────────── */}
       <div
-        className={`overflow-y-scroll overscroll-contain transition-all duration-300 ${
-          isSheetCollapsed ? 'max-h-0 overflow-hidden pointer-events-none' : 'max-h-[42vh] sm:max-h-[60vh]'
+        className={`overflow-y-scroll overscroll-contain transition-all duration-350 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+          isSheetCollapsed ? 'max-h-0 opacity-0 overflow-hidden pointer-events-none' : 'max-h-[42vh] sm:max-h-[60vh] opacity-100'
         }`}
         style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
       >
@@ -122,7 +124,7 @@ export function CurtainControls() {
           {activeTab === 'position' && (
             <div className="flex flex-col gap-4 select-none">
               {/* Curtain drag hint */}
-              <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-100 text-neutral-700 text-xs leading-relaxed">
+              <div className="p-3.5 rounded-2xl bg-amber-50/80 border border-amber-100 text-neutral-700 text-xs leading-relaxed">
                 <p className="font-semibold text-neutral-900 mb-1 flex items-center gap-2">
                   <Move size={15} className="text-amber-600" />
                   Touch &amp; Drag to Position Curtain
@@ -145,7 +147,7 @@ export function CurtainControls() {
               <button
                 onClick={resetCurtainTransform}
                 style={{ touchAction: 'manipulation' }}
-                className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-neutral-200 text-xs font-medium text-neutral-700 hover:bg-neutral-50 active:scale-95 transition min-h-[44px]"
+                className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-neutral-200 text-xs font-medium text-neutral-700 hover:bg-neutral-50 active:scale-95 transition duration-150 min-h-[44px]"
               >
                 <RotateCcw size={14} />
                 <span>Center Curtain</span>

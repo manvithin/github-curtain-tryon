@@ -1,6 +1,6 @@
 {
-  "appId": "com.curtainstudio.app",
-  "appName": "Curtain Studio",
+  "appId": "com.ruam.visualizer",
+  "appName": "RUAM VISUALIZER",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"

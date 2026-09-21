@@ -64,3 +64,82 @@ export const CURTAIN_CONFIG = {
     defaultZ: 4.5
   }
 };
+
+export const BUILTIN_FABRICS = [
+  {
+    id: 'fabric-linen-natural',
+    name: 'Natural Beige Linen',
+    imageUrl: '/fabrics/linen_natural.webp',
+    thumbnailUrl: '/fabrics/linen_natural.webp',
+    repeatX: 1,
+    repeatY: 1,
+    category: 'Linen',
+    color: '#D8C7B0',
+    isCustom: false
+  },
+  {
+    id: 'fabric-velvet-navy',
+    name: 'Royal Navy Velvet',
+    imageUrl: '/fabrics/velvet_navy.webp',
+    thumbnailUrl: '/fabrics/velvet_navy.webp',
+    repeatX: 1,
+    repeatY: 1,
+    category: 'Velvet',
+    color: '#1E2D4A',
+    isCustom: false
+  },
+  {
+    id: 'fabric-cotton-charcoal',
+    name: 'Charcoal Slub Weave',
+    imageUrl: '/fabrics/cotton_charcoal.webp',
+    thumbnailUrl: '/fabrics/cotton_charcoal.webp',
+    repeatX: 1,
+    repeatY: 1,
+    category: 'Cotton',
+    color: '#34383C',
+    isCustom: false
+  },
+  {
+    id: 'fabric-silk-champagne',
+    name: 'Champagne Shimmer Silk',
+    imageUrl: '/fabrics/silk_champagne.webp',
+    thumbnailUrl: '/fabrics/silk_champagne.webp',
+    repeatX: 1,
+    repeatY: 1,
+    category: 'Silk',
+    color: '#F4ECE1',
+    isCustom: false
+  },
+  {
+    id: 'fabric-sheer-ivory',
+    name: 'Ivory Sheer Weave',
+    imageUrl: '/fabrics/sheer_ivory.webp',
+    thumbnailUrl: '/fabrics/sheer_ivory.webp',
+    repeatX: 1,
+    repeatY: 1,
+    category: 'Sheer',
+    color: '#F9F8F6',
+    isCustom: false
+  },
+  {
+    id: 'fabric-geo-sage',
+    name: 'Sage Herringbone Jacquard',
+    imageUrl: '/fabrics/geo_sage.webp',
+    thumbnailUrl: '/fabrics/geo_sage.webp',
+    repeatX: 1,
+    repeatY: 1,
+    category: 'Jacquard',
+    color: '#7C8C7E',
+    isCustom: false
+  }
+];
+
+export const DEFAULT_SAMPLE_ROOM = {
+  id: 'room-modern-living',
+  name: 'Modern Living Room',
+  url: '/rooms/modern_living.webp',
+  width: 1280,
+  height: 960,
+  isSample: true
+};
+
