@@ -1,6 +1,7 @@
 import React, { Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { CURTAIN_CONFIG } from '../../config/curtainConfig.js';
+import { CURTAIN_CONFIG, MODEL_CONFIG } from '../../config/curtainConfig.js';
+import { useVisualizerStore } from '../../store/visualizerStore.js';
 import { Background } from './Background.jsx';
 import { CurtainModel } from './CurtainModel.jsx';
 import { CurtainControls } from './CurtainControls.jsx';

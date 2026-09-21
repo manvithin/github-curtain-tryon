@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { CURTAIN_CONFIG } from '../config/curtainConfig.js';
+import { CURTAIN_CONFIG, BUILTIN_FABRICS, SHEER_PRESETS } from '../config/curtainConfig.js';
 
-const STORAGE_KEY = 'curtain_visualizer_project_v1';
+const STORAGE_KEY = 'curtain_visualizer_project_v2';
 
 // Initial default state
 const initialTransform = {
@@ -16,13 +16,19 @@ export const useVisualizerStore = create((set, get) => ({
   // Screen step: 'upload' | 'visualizer'
   step: 'upload',
 
+  // Active curtain model: 'single' | 'double'
+  selectedModel: 'single',
+
   // Room background photo { id, url, width, height, isSample }
   backgroundImage: null,
 
-  // Selected fabric { id, name, imageUrl, repeatX, repeatY, category, isCustom }
-  selectedFabric: null,
+  // Selected main front fabric { id, name, imageUrl, repeatX, repeatY, category, isCustom }
+  selectedFabric: BUILTIN_FABRICS[0] || null,
   fabrics: [],
   isLoadingFabrics: false,
+
+  // Selected rear sheer fabric for double-layer curtain
+  selectedSheerFabric: SHEER_PRESETS[0] || null,
 
   // Curtain 3D transform & dimension
   curtain: { ...initialTransform },
@@ -58,6 +64,11 @@ export const useVisualizerStore = create((set, get) => ({
 
   setStep: (step) => set({ step }),
 
+  setSelectedModel: (selectedModel) => {
+    set({ selectedModel });
+    get().saveToLocalStorage();
+  },
+
   setBackgroundImage: (image) => {
     set({
       backgroundImage: image,
@@ -70,6 +81,11 @@ export const useVisualizerStore = create((set, get) => ({
 
   setSelectedFabric: (fabric) => {
     set({ selectedFabric: fabric });
+    get().saveToLocalStorage();
+  },
+
+  setSelectedSheerFabric: (sheerFabric) => {
+    set({ selectedSheerFabric: sheerFabric });
     get().saveToLocalStorage();
   },
 
@@ -120,8 +136,10 @@ export const useVisualizerStore = create((set, get) => ({
     try {
       const state = get();
       const payload = {
+        selectedModel: state.selectedModel,
         backgroundImage: state.backgroundImage,
         selectedFabric: state.selectedFabric,
+        selectedSheerFabric: state.selectedSheerFabric,
         curtain: state.curtain
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -137,8 +155,10 @@ export const useVisualizerStore = create((set, get) => ({
         const parsed = JSON.parse(saved);
         if (parsed.backgroundImage) {
           set({
+            selectedModel: parsed.selectedModel || 'single',
             backgroundImage: parsed.backgroundImage,
-            selectedFabric: parsed.selectedFabric || null,
+            selectedFabric: parsed.selectedFabric || BUILTIN_FABRICS[0],
+            selectedSheerFabric: parsed.selectedSheerFabric || SHEER_PRESETS[0],
             curtain: { ...initialTransform, ...(parsed.curtain || {}) },
             step: 'visualizer'
           });
@@ -155,7 +175,10 @@ export const useVisualizerStore = create((set, get) => ({
     } catch (e) {}
     set({
       step: 'upload',
+      selectedModel: 'single',
       backgroundImage: null,
+      selectedFabric: BUILTIN_FABRICS[0],
+      selectedSheerFabric: SHEER_PRESETS[0],
       curtain: { ...initialTransform },
       animationState: { isOpen: false, openProgress: 0, isAnimating: false }
     });

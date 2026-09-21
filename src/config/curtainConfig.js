@@ -1,29 +1,40 @@
 /**
- * curtainConfig.js — Central configuration for Curtain Visualizer 3D model & rendering.
- *
- * To swap the Blender GLB model:
- * 1. Put the new .glb in /public/models/
- * 2. Update modelUrl below.
- * 3. Update targetMaterials / curtainMeshes if the new model uses different names.
+ * curtainConfig.js — Central configuration for Curtain Visualizer 3D models & rendering.
  */
 
+export const MODEL_CONFIG = {
+  single: {
+    id: 'single',
+    name: 'Single Layer Curtain',
+    url: '/models/curtain.glb',
+    frontMaterials: ['tissus curtain', 'mat_frontdrape', 'curtain', 'fabric', 'cloth'],
+    sheerMaterials: [],
+    tiebackMaterials: [],
+    rodMaterials: ['ral7016', 'métal gris brillant', 'cylinder'],
+    animationClips: ['Plane.045Action', 'Plane.052Action', 'Open', 'Close', 'Action']
+  },
+  double: {
+    id: 'double',
+    name: 'Double Layer Curtain',
+    url: '/models/Double_Curtain.glb',
+    frontMaterials: ['tissus curtain', 'mat_frontdrape', 'curtain', 'fabric', 'cloth'],
+    sheerMaterials: ['voilage', 'mat_backsheer', 'sheer', 'net', 'voile'],
+    tiebackMaterials: ['tiebacks', 'tieback', 'tissus curtain', 'mat_frontdrape'],
+    rodMaterials: ['ral7016', 'glass noise', 'cylinder', 'tringle'],
+    animationClips: ['Plane.004Action', 'Plane.005Action', 'Open', 'Close', 'Action']
+  }
+};
+
 export const CURTAIN_CONFIG = {
-  // Path to GLB asset (served from public folder)
+  // Default model
+  defaultModel: 'single',
   modelUrl: '/models/curtain.glb',
 
-  // Target material names where fabric texture will be applied
-  // Matches case-insensitively against material names in the GLB
-  targetMaterials: ['tissus curtain', 'curtain', 'fabric', 'cloth'],
-
-  // Mesh names / prefixes for the main fabric panels
-  curtainMeshes: ['plane.045', 'plane.052', 'plane.001', 'plane.004', 'plane.005', 'rideau'],
-
-  // Substrings of meshes to hide (e.g. tie-backs or brackets that shouldn't display during open/close)
+  // Substrings of meshes to hide if unwanted
   excludeMeshes: [
-    'tieback', 'tie_back', 'tieBack', 'tie-back',
     'holdback', 'hold_back',
     'hookback', 'hook',
-    'bracket', 'hardware'
+    'bracket'
   ],
 
   // Dimension limits (in meters)
@@ -34,23 +45,22 @@ export const CURTAIN_CONFIG = {
   minHeight: 0.3,
   maxHeight: 8.0,
 
-  // Texture tiling
+  // Texture tiling defaults
   defaultFabricRepeatX: 1,
   defaultFabricRepeatY: 1,
 
   // Animation config
   animationNames: {
-    // Target clips present in the Blender file (Plane.045Action, Plane.052Action) or generic names
     clips: ['Plane.045Action', 'Plane.052Action', 'Plane.004Action', 'Plane.005Action', 'Open', 'Close', 'Action'],
-    easeDuration: 0.8 // seconds
+    easeDuration: 0.8
   },
 
   // Lighting parameters
   lighting: {
-    ambientIntensity: 0.85,
-    directionalIntensity: 1.1,
+    ambientIntensity: 0.9,
+    directionalIntensity: 1.15,
     directionalPosition: [2, 4, 3],
-    fillIntensity: 0.4
+    fillIntensity: 0.45
   },
 
   // DPR clamping for mobile performance
@@ -75,7 +85,8 @@ export const BUILTIN_FABRICS = [
     repeatY: 1,
     category: 'Linen',
     color: '#D8C7B0',
-    isCustom: false
+    isCustom: false,
+    isSheer: false
   },
   {
     id: 'fabric-velvet-navy',
@@ -86,7 +97,8 @@ export const BUILTIN_FABRICS = [
     repeatY: 1,
     category: 'Velvet',
     color: '#1E2D4A',
-    isCustom: false
+    isCustom: false,
+    isSheer: false
   },
   {
     id: 'fabric-cotton-charcoal',
@@ -97,7 +109,8 @@ export const BUILTIN_FABRICS = [
     repeatY: 1,
     category: 'Cotton',
     color: '#34383C',
-    isCustom: false
+    isCustom: false,
+    isSheer: false
   },
   {
     id: 'fabric-silk-champagne',
@@ -108,7 +121,8 @@ export const BUILTIN_FABRICS = [
     repeatY: 1,
     category: 'Silk',
     color: '#F4ECE1',
-    isCustom: false
+    isCustom: false,
+    isSheer: false
   },
   {
     id: 'fabric-sheer-ivory',
@@ -119,7 +133,8 @@ export const BUILTIN_FABRICS = [
     repeatY: 1,
     category: 'Sheer',
     color: '#F9F8F6',
-    isCustom: false
+    isCustom: false,
+    isSheer: true
   },
   {
     id: 'fabric-geo-sage',
@@ -130,7 +145,47 @@ export const BUILTIN_FABRICS = [
     repeatY: 1,
     category: 'Jacquard',
     color: '#7C8C7E',
-    isCustom: false
+    isCustom: false,
+    isSheer: false
+  }
+];
+
+export const SHEER_PRESETS = [
+  {
+    id: 'sheer-ivory-weave',
+    name: 'Ivory Sheer Weave',
+    imageUrl: '/fabrics/sheer_ivory.webp',
+    thumbnailUrl: '/fabrics/sheer_ivory.webp',
+    repeatX: 1,
+    repeatY: 1,
+    category: 'Sheer',
+    color: '#F9F8F6',
+    isCustom: false,
+    isSheer: true
+  },
+  {
+    id: 'sheer-linen-voile',
+    name: 'Natural Linen Voile',
+    imageUrl: '/fabrics/linen_natural.webp',
+    thumbnailUrl: '/fabrics/linen_natural.webp',
+    repeatX: 1,
+    repeatY: 1,
+    category: 'Sheer',
+    color: '#D8C7B0',
+    isCustom: false,
+    isSheer: true
+  },
+  {
+    id: 'sheer-silk-mist',
+    name: 'Silk Mist Sheer',
+    imageUrl: '/fabrics/silk_champagne.webp',
+    thumbnailUrl: '/fabrics/silk_champagne.webp',
+    repeatX: 1,
+    repeatY: 1,
+    category: 'Sheer',
+    color: '#F4ECE1',
+    isCustom: false,
+    isSheer: true
   }
 ];
 
@@ -142,4 +197,3 @@ export const DEFAULT_SAMPLE_ROOM = {
   height: 960,
   isSample: true
 };
-

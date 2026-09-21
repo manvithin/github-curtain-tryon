@@ -41,14 +41,16 @@ function SliderRow({ label, value, min, max, step, onChange, unit = '', display 
 }
 
 export function CurtainControls() {
-  const activeTab          = useVisualizerStore((s) => s.activeTab);
-  const setActiveTab       = useVisualizerStore((s) => s.setActiveTab);
-  const isSheetCollapsed   = useVisualizerStore((s) => s.isSheetCollapsed);
-  const toggleSheetCollapsed = useVisualizerStore((s) => s.toggleSheetCollapsed);
+  const activeTab             = useVisualizerStore((s) => s.activeTab);
+  const setActiveTab          = useVisualizerStore((s) => s.setActiveTab);
+  const isSheetCollapsed      = useVisualizerStore((s) => s.isSheetCollapsed);
+  const toggleSheetCollapsed  = useVisualizerStore((s) => s.toggleSheetCollapsed);
   const resetCurtainTransform = useVisualizerStore((s) => s.resetCurtainTransform);
-  const curtain            = useVisualizerStore((s) => s.curtain);
-  const bgOffset           = useVisualizerStore((s) => s.bgOffset);
-  const setBgOffset        = useVisualizerStore((s) => s.setBgOffset);
+  const curtain               = useVisualizerStore((s) => s.curtain);
+  const bgOffset              = useVisualizerStore((s) => s.bgOffset);
+  const setBgOffset           = useVisualizerStore((s) => s.setBgOffset);
+  const selectedModel         = useVisualizerStore((s) => s.selectedModel);
+  const setSelectedModel      = useVisualizerStore((s) => s.setSelectedModel);
 
   return (
     <div
@@ -59,7 +61,7 @@ export function CurtainControls() {
         ${isSheetCollapsed ? 'translate-y-[calc(100%-98px)]' : 'translate-y-0'}
       `}
     >
-      {/* ── Drag handle (mobile only) — smooth tap to expand/collapse ─────────────────── */}
+      {/* ── Drag handle (mobile only) ── */}
       <div
         onClick={toggleSheetCollapsed}
         className="sm:hidden w-full flex flex-col items-center pt-2.5 pb-1 cursor-pointer shrink-0 active:opacity-70 transition-opacity"
@@ -75,7 +77,39 @@ export function CurtainControls() {
         </div>
       </div>
 
-      {/* ── Tab Bar — always visible (the "peek" strip when collapsed) ────── */}
+      {/* ── Model Selector ── */}
+      <div className="flex px-4 py-2 bg-neutral-50 border-b border-neutral-100 gap-2 justify-center shrink-0">
+        <button
+          onClick={() => {
+            if (isSheetCollapsed) toggleSheetCollapsed();
+            setSelectedModel('single');
+          }}
+          style={{ touchAction: 'manipulation' }}
+          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+            selectedModel === 'single'
+              ? 'bg-neutral-900 text-white shadow'
+              : 'bg-neutral-200 text-neutral-700 hover:bg-neutral-300'
+          }`}
+        >
+          Single Layer
+        </button>
+        <button
+          onClick={() => {
+            if (isSheetCollapsed) toggleSheetCollapsed();
+            setSelectedModel('double');
+          }}
+          style={{ touchAction: 'manipulation' }}
+          className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
+            selectedModel === 'double'
+              ? 'bg-neutral-900 text-white shadow'
+              : 'bg-neutral-200 text-neutral-700 hover:bg-neutral-300'
+          }`}
+        >
+          Double Layer
+        </button>
+      </div>
+
+      {/* ── Tab Bar — always visible (the "peek" strip when collapsed) ── */}
       <div className="flex border-b border-neutral-100 px-2 shrink-0 bg-white">
         {TABS.map((tab) => {
           const Icon = tab.icon;
@@ -101,11 +135,7 @@ export function CurtainControls() {
         })}
       </div>
 
-      {/* ── Scrollable Tab Content ──────────────────────────────────────────
-          Hidden when collapsed so the sheet shows just the handle + tab bar.
-          scroll-touch enables momentum scrolling on iOS/Android.
-          touch-action:pan-y lets the browser scroll without fighting R3F.
-      ─────────────────────────────────────────────────────────────────────── */}
+      {/* ── Scrollable Tab Content ── */}
       <div
         className={`overflow-y-scroll overscroll-contain transition-all duration-350 ease-[cubic-bezier(0.32,0.72,0,1)] ${
           isSheetCollapsed ? 'max-h-0 opacity-0 overflow-hidden pointer-events-none' : 'max-h-[42vh] sm:max-h-[60vh] opacity-100'
@@ -207,7 +237,7 @@ export function CurtainControls() {
           {activeTab === 'animation' && <AnimationControls />}
         </div>
 
-        {/* Grace area above Android gesture bar — ensures last button is never obscured */}
+        {/* Grace area above Android gesture bar */}
         <div
           style={{
             height: 'max(env(safe-area-inset-bottom, 0px), 28px)',
