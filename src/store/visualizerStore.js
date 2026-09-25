@@ -19,6 +19,12 @@ export const useVisualizerStore = create((set, get) => ({
   // Active curtain model: 'single' | 'double'
   selectedModel: 'single',
 
+  // Active gesture target layer: 'curtain' | 'photo'
+  selectedLayer: 'curtain',
+
+  // Active gesture drag state (for disabling backdrop-filter during 60fps gestures)
+  isTransforming: false,
+
   // Room background photo { id, url, width, height, isSample }
   backgroundImage: null,
 
@@ -68,6 +74,10 @@ export const useVisualizerStore = create((set, get) => ({
     set({ selectedModel });
     get().saveToLocalStorage();
   },
+
+  setSelectedLayer: (selectedLayer) => set({ selectedLayer }),
+
+  setIsTransforming: (isTransforming) => set({ isTransforming }),
 
   setBackgroundImage: (image) => {
     set({

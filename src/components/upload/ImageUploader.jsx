@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { Camera, Upload, Image as ImageIcon, Sparkles, AlertCircle } from 'lucide-react';
 import { useVisualizerStore } from '../../store/visualizerStore.js';
 import { CameraCapture } from './CameraCapture.jsx';
+import { processRoomImage } from '../../utils/imageUtils.js';
 
 const SAMPLE_ROOMS = [
   {
@@ -77,22 +78,18 @@ export function ImageUploader() {
         }
       }
 
-      // Fallback: Read client-side directly if backend is offline/bypassed
-      const localUrl = URL.createObjectURL(file);
-      const img = new Image();
-      img.onload = () => {
-        setBackgroundImage({
-          id: `local-${Date.now()}`,
-          url: localUrl,
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-          isSample: false
-        });
-        showToast('Room photo loaded!', 'success');
-      };
-      img.src = localUrl;
+      // Client-side processing: downsample to max 2048px for GPU performance
+      const { dataUrl, width, height } = await processRoomImage(file);
+      setBackgroundImage({
+        id: `local-${Date.now()}`,
+        url: dataUrl,
+        width,
+        height,
+        isSample: false
+      });
+      showToast('Room photo loaded!', 'success');
     } catch (err) {
-      console.warn('Backend upload failed, falling back to local file:', err);
+      console.warn('Image processing fallback:', err);
       const localUrl = URL.createObjectURL(file);
       setBackgroundImage({
         id: `local-${Date.now()}`,
