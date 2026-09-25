@@ -36,9 +36,15 @@ export function useCurtainModel(url, selectedModel = CURTAIN_CONFIG.defaultModel
     const rods     = [];
 
     clonedScene.traverse((node) => {
-      if (!node.isMesh) return;
-
       const name = (node.name || '').toLowerCase();
+
+      // For double curtain GLB, hide duplicate LOD/offset subtrees (.001, .002) exported by Blender
+      if (selectedModel === 'double' && (name.includes('.001') || name.includes('.002'))) {
+        node.visible = false;
+        if (node.isMesh) return;
+      }
+
+      if (!node.isMesh) return;
 
       // Hide hardware we never want to show
       if (excludePats.some((p) => name.includes(p))) {

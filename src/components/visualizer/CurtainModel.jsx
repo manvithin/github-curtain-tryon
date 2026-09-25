@@ -83,6 +83,24 @@ export function CurtainModel() {
   // ── Play open / close pleat animations ──────────────────────────────────────
   useCurtainAnimation(scene, animations);
 
+  // ── Explicit single-instance lifecycle management (prevents duplicate curtains) ──
+  useEffect(() => {
+    const group = groupRef.current;
+    if (!group || !scene) return;
+
+    // Clear any existing children to strictly enforce ONE curtain instance in the scene
+    while (group.children.length > 0) {
+      group.remove(group.children[0]);
+    }
+    group.add(scene);
+
+    return () => {
+      while (group.children.length > 0) {
+        group.remove(group.children[0]);
+      }
+    };
+  }, [scene]);
+
   return (
     <>
       {/* Base Lighting */}
@@ -112,10 +130,8 @@ export function CurtainModel() {
         </>
       )}
 
-      {/* 3D Model */}
-      <group ref={groupRef} dispose={null}>
-        <primitive object={scene} />
-      </group>
+      {/* 3D Curtain Model Group (guaranteed exactly one instance) */}
+      <group ref={groupRef} />
     </>
   );
 }

@@ -296,15 +296,6 @@ export function CleanLayout() {
         </div>
       </div>
 
-      {/* ── RUAM WATERMARK (Top Right Corner, subtle brand watermark, non-blocking) ── */}
-      <div className="fixed top-[max(env(safe-area-inset-top,0px),12px)] right-4 z-25 pointer-events-none select-none">
-        <img
-          src="/RUAM_WATERMARK.png"
-          alt="RUAM"
-          className="h-9 w-auto object-contain opacity-80 drop-shadow-[0_2px_10px_rgba(0,0,0,0.6)]"
-        />
-      </div>
-
       {/* ── MINIMAL TOP BAR: Floating & Translucent ── */}
       <header className="absolute top-0 left-0 right-0 z-30 pointer-events-none pt-[max(env(safe-area-inset-top,0px),12px)] px-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
@@ -345,8 +336,8 @@ export function CleanLayout() {
             </button>
           </div>
 
-          {/* Save Preview Button (Comfortably spaced beside watermark) */}
-          <div className="pointer-events-auto flex items-center pr-12 sm:pr-14">
+          {/* Save Preview Button */}
+          <div className="pointer-events-auto flex items-center">
             <button
               onClick={handleExport}
               style={{ touchAction: 'manipulation' }}

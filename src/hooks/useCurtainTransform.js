@@ -270,7 +270,9 @@ export function useCurtainTransform(groupRef, baseDimensions) {
       }
     };
 
-    // ── 2-Finger Touch: Selects Curtain & Direct Width/Height Adjustment Only ──
+    // ── 2-Finger Touch: Strict Axis-Locked Width OR Height Adjustment Only ──
+    let lockedAxis = null; // 'horizontal' | 'vertical'
+
     const onTouchStart = (e) => {
       if (e.touches.length === 2) {
         // Two-finger touch selects curtain and activates subtle 3D rim glow
@@ -286,6 +288,10 @@ export function useCurtainTransform(groupRef, baseDimensions) {
 
         const dx = Math.abs(t2.clientX - t1.clientX);
         const dy = Math.abs(t2.clientY - t1.clientY);
+
+        // Determine dominant finger arrangement at the start and LOCK that axis
+        // Horizontal: dx >= dy -> WIDTH ONLY. Vertical: dy > dx -> HEIGHT ONLY.
+        lockedAxis = dx >= dy ? 'horizontal' : 'vertical';
 
         pinchStartRef.current = {
           distX: Math.max(dx, 20),
@@ -309,17 +315,24 @@ export function useCurtainTransform(groupRef, baseDimensions) {
 
       const { distX, distY, startWidth, startHeight } = pinchStartRef.current;
 
-      // Two fingers moving horizontally apart/together → changes WIDTH only
-      const scaleXRatio = currentDx / distX;
-      let newW = startWidth * scaleXRatio;
-      newW = Math.max(BOUNDS.minWidth, Math.min(BOUNDS.maxWidth, newW));
+      let newW = startWidth;
+      let newH = startHeight;
 
-      // Two fingers moving vertically apart/together → changes HEIGHT only
-      const scaleYRatio = currentDy / distY;
-      let newH = startHeight * scaleYRatio;
-      newH = Math.max(BOUNDS.minHeight, Math.min(BOUNDS.maxHeight, newH));
+      if (lockedAxis === 'horizontal') {
+        // Horizontal arrangement: WIDTH ONLY. Height remains strictly unchanged!
+        const scaleXRatio = currentDx / distX;
+        newW = startWidth * scaleXRatio;
+        newW = Math.max(BOUNDS.minWidth, Math.min(BOUNDS.maxWidth, newW));
+        newH = startHeight; // Strictly unchanged
+      } else if (lockedAxis === 'vertical') {
+        // Vertical arrangement: HEIGHT ONLY. Width remains strictly unchanged!
+        const scaleYRatio = currentDy / distY;
+        newH = startHeight * scaleYRatio;
+        newH = Math.max(BOUNDS.minHeight, Math.min(BOUNDS.maxHeight, newH));
+        newW = startWidth; // Strictly unchanged
+      }
 
-      // ROTATION IS NEVER MODIFIED HERE. Finger twist is 100% ignored.
+      // ROTATION IS NEVER MODIFIED BY GESTURES.
       // Direct Three.js ref mutation at 60fps
       const { scaleX, scaleY, scaleZ } = calculateCurtainScale(baseDimensions, {
         width: newW,
@@ -336,11 +349,18 @@ export function useCurtainTransform(groupRef, baseDimensions) {
         isPinchingRef.current = false;
         setIsTransforming(false);
 
-        // Commit final width and height ONCE to Zustand store. Rotation is NOT touched!
-        setCurtainTransform({
-          width: parseFloat(currentTransformRef.current.width.toFixed(2)),
-          height: parseFloat(currentTransformRef.current.height.toFixed(2))
-        });
+        // Commit only the axis that was adjusted
+        if (lockedAxis === 'horizontal') {
+          setCurtainTransform({
+            width: parseFloat(currentTransformRef.current.width.toFixed(2))
+          });
+        } else if (lockedAxis === 'vertical') {
+          setCurtainTransform({
+            height: parseFloat(currentTransformRef.current.height.toFixed(2))
+          });
+        }
+
+        lockedAxis = null;
       }
     };
 

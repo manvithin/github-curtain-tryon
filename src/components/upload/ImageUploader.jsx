@@ -137,7 +137,10 @@ export function ImageUploader() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-neutral-50 via-white to-neutral-100 flex flex-col items-center justify-center p-4 sm:p-6 select-none">
+    <div className="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center p-4 sm:p-6 select-none relative overflow-hidden">
+      {/* Background ambient lighting */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+
       {/* Hidden file inputs */}
       <input
         ref={fileInputRef}
@@ -156,26 +159,28 @@ export function ImageUploader() {
       />
 
       {/* Main card */}
-      <div className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-neutral-100/80 text-center">
-        {/* Brand Icon */}
-        <div className="w-16 h-16 rounded-2xl bg-neutral-900 text-white flex items-center justify-center mx-auto mb-5 shadow-md">
-          <Sparkles size={28} className="text-amber-400" />
+      <div className="relative z-10 w-full max-w-md bg-neutral-900/85 backdrop-blur-2xl rounded-3xl p-6 sm:p-8 shadow-[0_20px_50px_rgba(0,0,0,0.8)] border border-white/10 text-center">
+        {/* RUAM Brand Logo */}
+        <div className="flex items-center justify-center mx-auto mb-6">
+          <img
+            src="/RUAM_WATERMARK.png"
+            alt="RUAM"
+            className="h-12 w-auto object-contain opacity-95 drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)]"
+          />
         </div>
 
-        <h1 className="text-2xl sm:text-3xl font-bold text-neutral-900 tracking-tight mb-2">
-          Visualize Your Curtains
+        <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight mb-2">
+          Curtain Visualizer
         </h1>
-        <p className="text-sm text-neutral-500 mb-8 leading-relaxed max-w-xs mx-auto">
-          Photograph your window or upload a room image to preview realistic 3D curtains with custom fabrics.
+        <p className="text-xs sm:text-sm text-neutral-400 mb-7 leading-relaxed max-w-xs mx-auto">
+          Photograph your window or upload a room photo to see how custom curtains will look in your space.
         </p>
 
         {/* Primary Actions */}
-        <div className="flex flex-col gap-3.5 mb-8">
+        <div className="flex flex-col gap-3 mb-7">
           {/* Take Photo Button */}
           <button
             onClick={() => {
-              // On mobile, native capture input opens device camera directly.
-              // On desktop without mobile capture, offer the WebRTC camera modal.
               if (/Mobi|Android|iPhone/i.test(navigator.userAgent)) {
                 cameraInputRef.current?.click();
               } else {
@@ -183,26 +188,28 @@ export function ImageUploader() {
               }
             }}
             disabled={isUploading}
-            className="w-full h-14 rounded-2xl bg-neutral-900 hover:bg-black active:scale-[0.98] text-white font-medium flex items-center justify-center gap-3 transition shadow-md disabled:opacity-50 text-base"
+            style={{ touchAction: 'manipulation' }}
+            className="w-full h-13 rounded-2xl bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-neutral-950 font-bold flex items-center justify-center gap-2.5 transition active:scale-98 shadow-lg shadow-amber-400/20 disabled:opacity-50 text-sm"
           >
-            <Camera size={20} className="text-amber-400" />
-            <span>Take Photo</span>
+            <Camera size={19} />
+            <span>Take Window Photo</span>
           </button>
 
           {/* Upload Photo Button */}
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
-            className="w-full h-14 rounded-2xl bg-neutral-100 hover:bg-neutral-200/80 active:scale-[0.98] text-neutral-800 font-medium flex items-center justify-center gap-3 transition disabled:opacity-50 text-base border border-neutral-200/60"
+            style={{ touchAction: 'manipulation' }}
+            className="w-full h-13 rounded-2xl bg-white/10 hover:bg-white/15 active:bg-white/20 text-white font-medium flex items-center justify-center gap-2.5 transition active:scale-98 disabled:opacity-50 text-sm border border-white/10"
           >
-            <Upload size={20} className="text-neutral-600" />
+            <Upload size={18} className="text-white/80" />
             <span>Upload Photo</span>
           </button>
         </div>
 
         {/* Quick Start Presets */}
-        <div className="border-t border-neutral-100 pt-6">
-          <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-4">
+        <div className="border-t border-white/10 pt-5">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400 mb-3.5">
             Or try with a sample room
           </p>
           <div className="grid grid-cols-3 gap-2.5">
@@ -210,16 +217,17 @@ export function ImageUploader() {
               <button
                 key={room.id}
                 onClick={() => handleSelectSample(room)}
-                className="group flex flex-col items-center gap-1.5 p-2 rounded-xl border border-neutral-100 hover:border-neutral-300 hover:bg-neutral-50 transition active:scale-95"
+                style={{ touchAction: 'manipulation' }}
+                className="group flex flex-col items-center gap-1.5 p-1.5 rounded-xl border border-white/10 hover:border-amber-400/60 bg-white/5 hover:bg-white/10 transition active:scale-95"
               >
-                <div className="w-full aspect-4/3 rounded-lg overflow-hidden bg-neutral-200 relative">
+                <div className="w-full aspect-4/3 rounded-lg overflow-hidden bg-neutral-800 relative">
                   <img
                     src={room.url}
                     alt={room.name}
                     className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                   />
                 </div>
-                <span className="text-[11px] font-medium text-neutral-600 group-hover:text-neutral-900 truncate w-full text-center">
+                <span className="text-[10px] font-medium text-neutral-300 group-hover:text-white truncate w-full text-center">
                   {room.name.split(' ')[0]}
                 </span>
               </button>

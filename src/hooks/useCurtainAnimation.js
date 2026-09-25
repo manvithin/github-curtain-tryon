@@ -80,6 +80,12 @@ export function useCurtainAnimation(root, clips = []) {
       const name = node.name || '';
       const nl   = name.toLowerCase();
 
+      // Fix rogue Anneau.007 transform glitch (was offset and rotated in Blender GLB export)
+      if (name === 'Anneau.007') {
+        node.position.set(0.08076477, 3.250244, -0.048188);
+        node.rotation.set(0, 0, 0);
+      }
+
       // Ring empties
       if (leftPat.test(name)) {
         leftRings.push({ node, initialX: node.position.x });
@@ -103,19 +109,32 @@ export function useCurtainAnimation(root, clips = []) {
       }
     });
 
-    // Compute the anchor positions (where rings cluster when fully open)
-    const leftAnchorX  = leftRings.length  > 0 ? Math.min(...leftRings.map((r)  => r.initialX)) : -0.6;
-    const rightAnchorX = rightRings.length > 0 ? Math.max(...rightRings.map((r) => r.initialX)) :  0.6;
+    // Sort rings from left to right so they accordion-stack naturally above each fabric pleat
+    leftRings.sort((a, b) => a.initialX - b.initialX);
+    rightRings.sort((a, b) => a.initialX - b.initialX);
 
-    leftRingsRef.current  = leftRings.map((r)  => ({ ...r, anchorX: leftAnchorX  }));
-    rightRingsRef.current = rightRings.map((r) => ({ ...r, anchorX: rightAnchorX }));
+    // Left panel pleat bounds when fully open: [-0.589, -0.285] (~30cm gathered stack)
+    const leftAnchorX = leftRings.length > 0 ? leftRings[0].initialX : -0.589;
+    const leftInnerX  = -0.285;
+    leftRingsRef.current = leftRings.map((r, i) => {
+      const openX = leftRings.length > 1
+        ? leftAnchorX + (i / (leftRings.length - 1)) * (leftInnerX - leftAnchorX)
+        : leftAnchorX;
+      return { ...r, openX };
+    });
+
+    // Right panel pleat bounds when fully open: [+0.285, +0.585] (~30cm gathered stack)
+    const rightAnchorX = rightRings.length > 0 ? rightRings[rightRings.length - 1].initialX : 0.585;
+    const rightInnerX  = 0.285;
+    rightRingsRef.current = rightRings.map((r, i) => {
+      const openX = rightRings.length > 1
+        ? rightInnerX + (i / (rightRings.length - 1)) * (rightAnchorX - rightInnerX)
+        : rightAnchorX;
+      return { ...r, openX };
+    });
+
     hardwareRef.current   = hardware;
     prevProgressRef.current = -1; // force first-frame update
-
-    console.log(
-      `[CurtainAnim] clips=${matched.length}  leftRings=${leftRings.length}  rightRings=${rightRings.length}`,
-      `leftAnchor=${leftAnchorX.toFixed(3)}  rightAnchor=${rightAnchorX.toFixed(3)}`
-    );
 
     return () => {
       if (mixerRef.current) {
@@ -155,14 +174,12 @@ export function useCurtainAnimation(root, clips = []) {
       }
     });
 
-    // 3. Slide ring empties along the rod
-    //    Left rings move toward anchorX (leftmost) as t → 1
-    leftRingsRef.current.forEach(({ node, initialX, anchorX }) => {
-      node.position.x = initialX + (anchorX - initialX) * t;
+    // 3. Slide ring empties along the rod in an orderly accordion stack above each pleat
+    leftRingsRef.current.forEach(({ node, initialX, openX }) => {
+      node.position.x = initialX + (openX - initialX) * t;
     });
-    //    Right rings move toward anchorX (rightmost) as t → 1
-    rightRingsRef.current.forEach(({ node, initialX, anchorX }) => {
-      node.position.x = initialX + (anchorX - initialX) * t;
+    rightRingsRef.current.forEach(({ node, initialX, openX }) => {
+      node.position.x = initialX + (openX - initialX) * t;
     });
   });
 }
