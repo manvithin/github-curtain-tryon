@@ -1,7 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { Camera, X, RotateCcw, Check } from 'lucide-react';
 
-export function CameraCapture({ onCapture, onClose }) {
+export function CameraCapture({ title = 'Capture Photo', onCapture, onClose }) {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [stream, setStream] = useState(null);
@@ -67,7 +67,7 @@ export function CameraCapture({ onCapture, onClose }) {
     <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-between p-4">
       {/* Top bar */}
       <div className="w-full flex justify-between items-center text-white z-10 py-2">
-        <span className="text-sm font-medium">Capture Window / Room</span>
+        <span className="text-sm font-medium">{title}</span>
         <button onClick={onClose} className="p-2 rounded-full bg-white/20 hover:bg-white/30 text-white transition">
           <X size={20} />
         </button>

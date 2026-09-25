@@ -1,182 +1,279 @@
-import React, { Suspense, useState, useRef } from 'react';
+import React, { Suspense, useState, useRef, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import {
   ArrowLeft,
   Download,
-  RotateCcw,
-  Eye,
-  EyeOff,
+  Camera,
+  Upload,
+  Plus,
+  Check,
   ChevronUp,
   ChevronDown,
+  Layers,
   Sparkles,
-  ImageIcon,
+  Sliders,
+  Maximize2,
+  Image as ImageIcon,
+  RotateCcw,
   Loader2,
-  SlidersHorizontal,
-  Check
+  X
 } from 'lucide-react';
-import { CURTAIN_CONFIG } from '../../config/curtainConfig.js';
+import { CURTAIN_CONFIG, BUILTIN_FABRICS, SHEER_PRESETS } from '../../config/curtainConfig.js';
 import { useVisualizerStore } from '../../store/visualizerStore.js';
 import { Background } from './Background.jsx';
 import { CurtainModel } from './CurtainModel.jsx';
-import { CurtainTransformOverlay } from './CurtainTransformOverlay.jsx';
 import { ExportModal } from '../ui/ExportModal.jsx';
-import { compositePreview } from '../../utils/imageUtils.js';
+import { CameraCapture } from '../upload/CameraCapture.jsx';
+import { compositePreview, processFabricImage, processRoomImage } from '../../utils/imageUtils.js';
 import { usePinchToZoom } from '../../hooks/usePinchToZoom.js';
 
-// ── Reusable Dark-Glass Slider Row for Advanced Accordion ─────────────────────
-function GlassSliderRow({ label, value, min, max, step, onChange, unit = '', display }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <div className="flex justify-between items-center">
-        <span className="text-[11px] text-neutral-300 font-medium">{label}</span>
-        <span className="text-[11px] font-bold text-white font-mono bg-white/10 px-2 py-0.5 rounded-md border border-white/15">
-          {display !== undefined ? display : `${value}${unit}`}
-        </span>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
-        style={{ touchAction: 'pan-x' }}
-        className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
-      />
-      <div className="flex justify-between text-[10px] text-neutral-400">
-        <span>{min}{unit}</span>
-        <span>{max}{unit}</span>
-      </div>
-    </div>
-  );
-}
-
-// ── Canvas Loader Indicator ──────────────────────────────────────────────────
 function CanvasLoader() {
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-black/30 backdrop-blur-xs z-10 select-none pointer-events-none">
-      <div className="bg-neutral-900/90 text-white px-4 py-3 rounded-2xl shadow-2xl flex items-center gap-3 border border-white/20">
-        <Loader2 className="animate-spin text-amber-400" size={20} />
-        <span className="text-sm font-medium">Loading 3D Curtain...</span>
+    <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-xs z-10 select-none pointer-events-none">
+      <div className="bg-neutral-900/90 text-white px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-2.5 border border-white/15">
+        <Loader2 className="animate-spin text-amber-400" size={18} />
+        <span className="text-xs font-medium tracking-wide">Loading Curtain...</span>
       </div>
     </div>
   );
 }
 
-// ── Main CleanLayout Component ───────────────────────────────────────────────
 export function CleanLayout() {
   const viewportRef = useRef(null);
-  const handleRef = useRef(null);
+  const fabricFileInputRef = useRef(null);
+  const fabricCameraInputRef = useRef(null);
+  const roomFileInputRef = useRef(null);
+  const roomCameraInputRef = useRef(null);
 
-  // Zustand Store
+  // Store
   const setStep = useVisualizerStore((s) => s.setStep);
   const selectedModel = useVisualizerStore((s) => s.selectedModel);
   const setSelectedModel = useVisualizerStore((s) => s.setSelectedModel);
-  const selectedLayer = useVisualizerStore((s) => s.selectedLayer);
-  const setSelectedLayer = useVisualizerStore((s) => s.setSelectedLayer);
-  const isTransforming = useVisualizerStore((s) => s.isTransforming);
+  const selectedFabric = useVisualizerStore((s) => s.selectedFabric);
+  const setSelectedFabric = useVisualizerStore((s) => s.setSelectedFabric);
+  const selectedSheerFabric = useVisualizerStore((s) => s.selectedSheerFabric);
+  const setSelectedSheerFabric = useVisualizerStore((s) => s.setSelectedSheerFabric);
+  const fabrics = useVisualizerStore((s) => s.fabrics);
+  const setFabrics = useVisualizerStore((s) => s.setFabrics);
   const curtain = useVisualizerStore((s) => s.curtain);
   const setCurtainTransform = useVisualizerStore((s) => s.setCurtainTransform);
   const resetCurtainTransform = useVisualizerStore((s) => s.resetCurtainTransform);
+  const animationState = useVisualizerStore((s) => s.animationState);
+  const setAnimationState = useVisualizerStore((s) => s.setAnimationState);
   const bgOffset = useVisualizerStore((s) => s.bgOffset);
   const setBgOffset = useVisualizerStore((s) => s.setBgOffset);
   const backgroundImage = useVisualizerStore((s) => s.backgroundImage);
+  const setBackgroundImage = useVisualizerStore((s) => s.setBackgroundImage);
   const setExportModal = useVisualizerStore((s) => s.setExportModal);
   const showToast = useVisualizerStore((s) => s.showToast);
 
-  // Drawer States: 'peek' (~150px) | 'expanded' (shows Advanced fallback) | 'hidden' (fully collapsed)
-  const [drawerState, setDrawerState] = useState('peek');
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [isDraggingHandle, setIsDraggingHandle] = useState(false);
+  // Bottom Sheet State: 'collapsed' (minimal peek ~70px) | 'expanded' (~230px)
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState('fabric'); // 'fabric' | 'openclose' | 'size' | 'room'
+  const [doubleLayerTarget, setDoubleLayerTarget] = useState('front'); // 'front' | 'sheer'
+  const [showFabricChoiceModal, setShowFabricChoiceModal] = useState(false);
+  const [showWebcamModal, setShowWebcamModal] = useState(false);
+  const [webcamTarget, setWebcamTarget] = useState('fabric'); // 'fabric' | 'room'
+  const [isProcessing, setIsProcessing] = useState(false);
 
-  // Attach midpoint-centered pinch-to-zoom and pan gesture handler for background
+  // Attach background pinch/pan zoom
   usePinchToZoom(viewportRef);
 
-  // Export Preview
+  // Initialize fabrics if empty
+  useEffect(() => {
+    if (!fabrics || fabrics.length === 0) {
+      setFabrics([...BUILTIN_FABRICS]);
+    }
+  }, [fabrics, setFabrics]);
+
+  // Pattern Size Slider Value (derived from current fabric repeat)
+  // Higher repeat = smaller pattern size
+  const currentRepeat = (doubleLayerTarget === 'sheer' && selectedModel === 'double')
+    ? (selectedSheerFabric?.repeatX || 1)
+    : (selectedFabric?.repeatX || 1);
+
+  // Convert repeat to 1..5 pattern size scale
+  const patternSizeValue = Math.max(1, Math.min(5, Math.round(6 - currentRepeat)));
+
+  const handlePatternSizeChange = (val) => {
+    const num = parseInt(val, 10);
+    // Inverse mapping: Larger pattern size = smaller repeat (e.g. size 5 -> repeat 1, size 1 -> repeat 5)
+    const newRepeat = Math.max(1, 6 - num);
+
+    if (doubleLayerTarget === 'sheer' && selectedModel === 'double') {
+      if (!selectedSheerFabric) return;
+      const updated = { ...selectedSheerFabric, repeatX: newRepeat, repeatY: newRepeat };
+      setSelectedSheerFabric(updated);
+    } else {
+      if (!selectedFabric) return;
+      const updated = { ...selectedFabric, repeatX: newRepeat, repeatY: newRepeat };
+      setSelectedFabric(updated);
+      setFabrics(fabrics.map((f) => (f.id === selectedFabric.id ? updated : f)));
+    }
+  };
+
+  // Open/Close Animation Scrubber Handler
+  const handleScrubOpen = (pct) => {
+    const p = parseFloat(pct) / 100;
+    setAnimationState({
+      openProgress: p,
+      isOpen: p >= 0.95,
+      isAnimating: false
+    });
+  };
+
+  // Quick Open / Close action
+  const handleAnimateToggle = (targetOpen) => {
+    const start = performance.now();
+    const duration = 650;
+    const fromProgress = animationState.openProgress;
+    setAnimationState({ isAnimating: true });
+
+    function tick(now) {
+      const elapsed = now - start;
+      const t = Math.min(1, elapsed / duration);
+      const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+      const nextProgress = fromProgress + (targetOpen ? 1 - fromProgress : -fromProgress) * eased;
+
+      setAnimationState({
+        openProgress: nextProgress,
+        isOpen: nextProgress >= 0.95
+      });
+
+      if (t < 1) {
+        requestAnimationFrame(tick);
+      } else {
+        setAnimationState({
+          isAnimating: false,
+          openProgress: targetOpen ? 1 : 0,
+          isOpen: targetOpen
+        });
+      }
+    }
+
+    requestAnimationFrame(tick);
+  };
+
+  // Add Custom Fabric File Processing
+  const handleFabricFile = async (file) => {
+    if (!file) return;
+    setIsProcessing(true);
+    try {
+      const dataUrl = await processFabricImage(file);
+      const fabricName = file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ') || 'Custom Fabric';
+      const newFabric = {
+        id: `custom-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        name: fabricName,
+        imageUrl: dataUrl,
+        thumbnailUrl: dataUrl,
+        repeatX: 1,
+        repeatY: 1,
+        isCustom: true,
+        category: 'Custom'
+      };
+
+      const updatedList = [newFabric, ...fabrics];
+      setFabrics(updatedList);
+
+      if (doubleLayerTarget === 'sheer' && selectedModel === 'double') {
+        setSelectedSheerFabric(newFabric);
+      } else {
+        setSelectedFabric(newFabric);
+      }
+    } catch (err) {
+      showToast('Could not process fabric image.', 'error');
+    } finally {
+      setIsProcessing(false);
+      setShowFabricChoiceModal(false);
+    }
+  };
+
+  // Change Room Photo File Processing
+  const handleRoomFile = async (file) => {
+    if (!file) return;
+    setIsProcessing(true);
+    try {
+      const { dataUrl, width, height } = await processRoomImage(file);
+      setBackgroundImage({
+        id: `room-${Date.now()}`,
+        url: dataUrl,
+        width,
+        height,
+        isSample: false
+      });
+    } catch (err) {
+      showToast('Could not process room image.', 'error');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Save / Export High-Res Preview
   const handleExport = async () => {
     try {
       const canvas = document.querySelector('canvas');
       if (!canvas || !backgroundImage?.url) {
-        showToast('Unable to capture preview. Scene not ready.', 'error');
+        showToast('Scene is not ready for export.', 'error');
         return;
       }
-      showToast('Generating high-resolution preview...', 'info', 2000);
+      showToast('Generating high-resolution preview...', 'info', 1500);
       const compositeDataUrl = await compositePreview(backgroundImage.url, canvas);
       setExportModal(true, compositeDataUrl);
     } catch (err) {
-      console.error('Export error:', err);
       showToast('Failed to generate preview image.', 'error');
     }
   };
 
-  // ── Exclusive Drawer Handle Drag Gesture ───────────────────────────────────
-  const dragStartYRef = useRef(0);
-  const dragStartStateRef = useRef('peek');
+  const openList = (doubleLayerTarget === 'sheer' && selectedModel === 'double')
+    ? SHEER_PRESETS
+    : fabrics;
 
-  const onHandlePointerDown = (e) => {
-    e.stopPropagation();
-    setIsDraggingHandle(true);
-    dragStartYRef.current = e.clientY;
-    dragStartStateRef.current = drawerState;
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch (err) {}
-  };
-
-  const onHandlePointerMove = (e) => {
-    if (!isDraggingHandle) return;
-    const deltaY = e.clientY - dragStartYRef.current;
-    if (deltaY < -35) {
-      setDrawerState('expanded');
-      setShowAdvanced(true);
-    } else if (deltaY > 40) {
-      if (dragStartStateRef.current === 'expanded') {
-        setDrawerState('peek');
-        setShowAdvanced(false);
-      } else {
-        setDrawerState('hidden');
-      }
-    }
-  };
-
-  const onHandlePointerUp = (e) => {
-    if (!isDraggingHandle) return;
-    setIsDraggingHandle(false);
-    try {
-      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      }
-    } catch (err) {}
-  };
-
-  const handleHandleClick = () => {
-    if (drawerState === 'peek') {
-      setDrawerState('expanded');
-      setShowAdvanced(true);
-    } else if (drawerState === 'expanded') {
-      setDrawerState('peek');
-      setShowAdvanced(false);
-    } else {
-      setDrawerState('peek');
-    }
-  };
+  const currentSelected = (doubleLayerTarget === 'sheer' && selectedModel === 'double')
+    ? selectedSheerFabric
+    : selectedFabric;
 
   return (
     <div
       ref={viewportRef}
       className="relative w-screen h-[100dvh] overflow-hidden bg-neutral-950 select-none touch-none flex flex-col font-sans"
     >
-      {/* ── BASE LAYER: Full-Bleed 100vw × 100dvh 3D Canvas & Room Background ── */}
+      {/* Hidden File Inputs */}
+      <input
+        ref={fabricFileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(e) => handleFabricFile(e.target.files?.[0])}
+      />
+      <input
+        ref={fabricCameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => handleFabricFile(e.target.files?.[0])}
+      />
+      <input
+        ref={roomFileInputRef}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(e) => handleRoomFile(e.target.files?.[0])}
+      />
+      <input
+        ref={roomCameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => handleRoomFile(e.target.files?.[0])}
+      />
+
+      {/* ── BASE LAYER (75%–90% of screen): Full-Bleed 3D Curtain & Room Photo ── */}
       <div className="absolute inset-0 z-0 overflow-hidden">
-        {/* Room Background Photo */}
         <Background />
 
-        {/* 3D WebGL Canvas Layer (Dims to 50% opacity when editing background photo) */}
-        <div
-          className={`absolute inset-0 z-10 touch-none transition-opacity duration-300 ${
-            selectedLayer === 'photo' ? 'opacity-50' : 'opacity-100'
-          }`}
-        >
+        <div className="absolute inset-0 z-10 touch-none">
           <Suspense fallback={<CanvasLoader />}>
             <Canvas
               dpr={CURTAIN_CONFIG.dpr}
@@ -197,288 +294,579 @@ export function CleanLayout() {
             </Canvas>
           </Suspense>
         </div>
-
-        {/* ── ON-CANVAS DIRECT MANIPULATION TRANSFORM BOUNDING BOX & HANDLES ── */}
-        <CurtainTransformOverlay containerRef={viewportRef} />
-
-        {/* Subtle dimming overlay when drawer is expanded */}
-        <div
-          className={`absolute inset-0 z-25 bg-black/25 pointer-events-none transition-opacity duration-300 ${
-            drawerState === 'expanded' ? 'opacity-100' : 'opacity-0'
-          }`}
-        />
       </div>
 
-      {/* ── TOP FLOATING BAR: Model Selector & Edit Photo Toggle ── */}
-      <div className="absolute top-0 left-0 right-0 z-30 pointer-events-none pt-[max(env(safe-area-inset-top,0px),16px)] px-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between gap-2">
-          {/* Left: Change Photo Button */}
+      {/* ── MINIMAL TOP BAR: Floating & Translucent ── */}
+      <header className="absolute top-0 left-0 right-0 z-30 pointer-events-none pt-[max(env(safe-area-inset-top,0px),12px)] px-4">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          {/* Change Photo Button */}
           <button
             onClick={() => setStep('upload')}
             style={{ touchAction: 'manipulation' }}
-            className="pointer-events-auto h-11 px-3.5 rounded-2xl bg-neutral-900/80 hover:bg-neutral-900 active:bg-neutral-800 text-white border border-white/15 shadow-lg flex items-center gap-2 transition active:scale-95 text-xs font-semibold"
+            className="pointer-events-auto h-10 px-3 rounded-full bg-black/40 hover:bg-black/60 active:bg-black/70 text-white/90 backdrop-blur-md border border-white/10 shadow-md flex items-center gap-1.5 transition active:scale-95 text-xs font-medium"
             title="Change Room Photo"
           >
-            <ArrowLeft size={16} className="text-neutral-200" />
-            <span className="hidden sm:inline">Change Photo</span>
+            <ArrowLeft size={15} />
+            <span className="hidden sm:inline">Change Room</span>
           </button>
 
-          {/* Center: Model Selector & Edit Photo Pill */}
-          <div className="pointer-events-auto flex items-center gap-2">
-            {/* Segmented Model Switcher */}
-            <div className="flex items-center p-1 rounded-full bg-neutral-900/85 border border-white/15 shadow-xl">
-              <button
-                onClick={() => setSelectedModel('single')}
-                style={{ touchAction: 'manipulation' }}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
-                  selectedModel === 'single'
-                    ? 'bg-white text-neutral-950 shadow-md font-bold'
-                    : 'text-neutral-300 hover:text-white'
-                }`}
-              >
-                Single
-              </button>
-              <button
-                onClick={() => setSelectedModel('double')}
-                style={{ touchAction: 'manipulation' }}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
-                  selectedModel === 'double'
-                    ? 'bg-white text-neutral-950 shadow-md font-bold'
-                    : 'text-neutral-300 hover:text-white'
-                }`}
-              >
-                Double
-              </button>
-            </div>
-
-            {/* "Edit Photo" Mode Toggle Pill (Secondary, unobtrusive) */}
+          {/* Model Switcher Pill */}
+          <div className="pointer-events-auto flex items-center p-0.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 shadow-md">
             <button
-              onClick={() => {
-                const nextLayer = selectedLayer === 'photo' ? 'curtain' : 'photo';
-                setSelectedLayer(nextLayer);
-                showToast(
-                  nextLayer === 'photo'
-                    ? 'Editing room photo: Drag to pan, pinch to zoom'
-                    : 'Editing curtain',
-                  'info',
-                  2000
-                );
-              }}
+              onClick={() => setSelectedModel('single')}
               style={{ touchAction: 'manipulation' }}
-              className={`h-9 px-3 rounded-full border text-xs font-semibold flex items-center gap-1.5 transition-all shadow-md active:scale-95 ${
-                selectedLayer === 'photo'
-                  ? 'bg-amber-400 text-neutral-950 border-amber-300 font-bold'
-                  : 'bg-neutral-900/80 text-neutral-300 hover:text-white border-white/15'
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                selectedModel === 'single'
+                  ? 'bg-white text-neutral-950 shadow-sm font-bold'
+                  : 'text-white/70 hover:text-white'
               }`}
-              title="Toggle Background Photo Editing"
             >
-              <ImageIcon size={14} />
-              <span>{selectedLayer === 'photo' ? 'Done' : 'Edit Photo'}</span>
+              Single Layer
+            </button>
+            <button
+              onClick={() => setSelectedModel('double')}
+              style={{ touchAction: 'manipulation' }}
+              className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                selectedModel === 'double'
+                  ? 'bg-white text-neutral-950 shadow-sm font-bold'
+                  : 'text-white/70 hover:text-white'
+              }`}
+            >
+              Double Layer
             </button>
           </div>
 
-          {/* Right: Save Preview Button */}
+          {/* Save Preview Button */}
           <button
             onClick={handleExport}
             style={{ touchAction: 'manipulation' }}
-            className="pointer-events-auto h-11 px-3.5 rounded-2xl bg-neutral-900/80 hover:bg-neutral-900 active:bg-neutral-800 text-white border border-white/15 shadow-lg flex items-center gap-2 transition active:scale-95 text-xs font-semibold"
-            title="Save Preview"
+            className="pointer-events-auto h-10 px-3.5 rounded-full bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-neutral-950 font-bold shadow-md flex items-center gap-1.5 transition active:scale-95 text-xs"
+            title="Save Image Preview"
           >
-            <Download size={16} className="text-neutral-200" />
-            <span className="hidden sm:inline">Save</span>
+            <Download size={15} />
+            <span>Save</span>
           </button>
         </div>
-      </div>
+      </header>
 
-      {/* ── FLOATING "HIDE UI" TOGGLE BUTTON (Bottom-Right, ≥44×44px hit area) ── */}
-      <button
-        onClick={() => setDrawerState(drawerState === 'hidden' ? 'peek' : 'hidden')}
-        style={{ touchAction: 'manipulation' }}
-        className="fixed z-40 right-4 bottom-[max(env(safe-area-inset-bottom,0px),20px)] w-12 h-12 rounded-full bg-neutral-900/85 hover:bg-neutral-800 active:bg-neutral-700 text-white border border-white/20 shadow-2xl flex items-center justify-center transition-all duration-200 active:scale-90"
-        title={drawerState === 'hidden' ? 'Show Controls' : 'Hide Controls'}
-        aria-label="Toggle UI Visibility"
-      >
-        {drawerState === 'hidden' ? <EyeOff size={20} /> : <Eye size={20} />}
-      </button>
-
-      {/* ── "SHOW CONTROLS" CENTERED PILL (Visible when Drawer is Hidden) ── */}
-      {drawerState === 'hidden' && (
-        <button
-          onClick={() => setDrawerState('peek')}
-          style={{ touchAction: 'manipulation' }}
-          className="fixed z-40 left-1/2 -translate-x-1/2 bottom-[max(env(safe-area-inset-bottom,0px),20px)] h-9 px-4 rounded-full bg-neutral-900/90 hover:bg-neutral-800 text-white border border-white/20 shadow-2xl flex items-center gap-1.5 transition-all duration-200 active:scale-95 text-xs font-semibold animate-in fade-in zoom-in-95"
-        >
-          <ChevronUp size={15} className="text-amber-400" />
-          <span>Show Controls</span>
-        </button>
-      )}
-
-      {/* ── SIMPLIFIED GLASSMORPHISM BOTTOM DRAWER ───────────────────────────── */}
+      {/* ── COLLAPSIBLE MINIMAL BOTTOM SHEET ── */}
       <div
         className={`
           fixed left-0 right-0 bottom-0 z-30
-          max-w-xl mx-auto
-          border-t border-white/15
-          rounded-t-[32px] shadow-[0_-12px_40px_rgba(0,0,0,0.6)]
+          max-w-2xl mx-auto
+          bg-neutral-950/85 backdrop-blur-2xl border-t border-white/10
+          rounded-t-[28px] shadow-[0_-10px_35px_rgba(0,0,0,0.6)]
           flex flex-col text-white
-          transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]
-          ${isTransforming ? 'bg-neutral-900/90' : 'bg-neutral-900/85 backdrop-blur-2xl'}
-          ${drawerState === 'hidden' ? 'translate-y-full pointer-events-none' : ''}
-          ${drawerState === 'peek' ? 'translate-y-[calc(100%-145px)]' : ''}
-          ${drawerState === 'expanded' ? 'translate-y-0' : ''}
+          transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)]
         `}
       >
-        {/* ── EXCLUSIVE DRAG HANDLE STRIP ── */}
+        {/* Drag Handle / Peek Header */}
         <div
-          ref={handleRef}
-          onPointerDown={onHandlePointerDown}
-          onPointerMove={onHandlePointerMove}
-          onPointerUp={onHandlePointerUp}
-          onPointerCancel={onHandlePointerUp}
-          onClick={handleHandleClick}
-          style={{ touchAction: 'none' }}
-          className="w-full flex flex-col items-center pt-3 pb-1 cursor-grab active:cursor-grabbing shrink-0 min-h-[44px] justify-center"
+          onClick={() => setIsExpanded(!isExpanded)}
+          style={{ touchAction: 'manipulation' }}
+          className="w-full flex flex-col items-center pt-2.5 pb-1 cursor-pointer shrink-0"
         >
-          <div className="w-12 h-1.5 bg-white/35 hover:bg-white/50 rounded-full mb-1 transition-all" />
-          <div className="text-neutral-400 flex items-center gap-1 text-[11px] font-medium">
-            <span>Direct Touch: Drag, pinch, twist or double-tap curtain</span>
-          </div>
+          <div className="w-10 h-1 bg-white/30 rounded-full mb-1" />
         </div>
 
-        {/* ── PRIMARY ACTIONS: Reset Curtain & Next: Add Fabric ── */}
-        <div className="px-4 py-2 shrink-0 flex flex-col gap-2">
-          <div className="flex items-center gap-2.5">
-            {/* Reset Curtain Button */}
+        {/* ── TAB BAR: Minimal Pill Switcher ── */}
+        <div className="px-4 pb-2 flex items-center justify-between gap-1 shrink-0">
+          <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
             <button
               onClick={() => {
-                resetCurtainTransform();
-                showToast('Curtain reset to center & default dimensions', 'info', 2000);
+                setActiveTab('fabric');
+                setIsExpanded(true);
               }}
-              style={{ touchAction: 'manipulation' }}
-              className="flex-1 py-2.5 px-3 rounded-2xl bg-white/10 hover:bg-white/15 active:bg-white/20 text-neutral-200 hover:text-white border border-white/15 text-xs font-semibold flex items-center justify-center gap-1.5 transition active:scale-95 min-h-[44px]"
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                activeTab === 'fabric'
+                  ? 'bg-white text-neutral-950 shadow-sm'
+                  : 'bg-white/10 text-white/75 hover:bg-white/15'
+              }`}
             >
-              <RotateCcw size={15} />
-              <span>Reset Curtain</span>
+              <Sparkles size={13} />
+              <span>Fabric</span>
             </button>
 
-            {/* Next: Add Fabric Placeholder Button */}
             <button
               onClick={() => {
-                showToast('Fabric selection coming in the next milestone', 'info', 2500);
+                setActiveTab('openclose');
+                setIsExpanded(true);
               }}
-              style={{ touchAction: 'manipulation' }}
-              className="flex-1 py-2.5 px-3 rounded-2xl bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-neutral-950 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-lg min-h-[44px]"
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                activeTab === 'openclose'
+                  ? 'bg-white text-neutral-950 shadow-sm'
+                  : 'bg-white/10 text-white/75 hover:bg-white/15'
+              }`}
             >
-              <Sparkles size={15} />
-              <span>Next: Add Fabric</span>
+              <Sliders size={13} />
+              <span>Open / Close</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('size');
+                setIsExpanded(true);
+              }}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                activeTab === 'size'
+                  ? 'bg-white text-neutral-950 shadow-sm'
+                  : 'bg-white/10 text-white/75 hover:bg-white/15'
+              }`}
+            >
+              <Maximize2 size={13} />
+              <span>Size</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab('room');
+                setIsExpanded(true);
+              }}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                activeTab === 'room'
+                  ? 'bg-white text-neutral-950 shadow-sm'
+                  : 'bg-white/10 text-white/75 hover:bg-white/15'
+              }`}
+            >
+              <ImageIcon size={13} />
+              <span>Room</span>
             </button>
           </div>
 
-          {/* Toggle for Advanced Numeric Fallback Accordion */}
           <button
-            onClick={() => {
-              const next = !showAdvanced;
-              setShowAdvanced(next);
-              setDrawerState(next ? 'expanded' : 'peek');
-            }}
-            style={{ touchAction: 'manipulation' }}
-            className="w-full py-1 text-[11px] text-neutral-400 hover:text-neutral-200 flex items-center justify-center gap-1 transition"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-1.5 rounded-full text-white/60 hover:text-white hover:bg-white/10 transition"
           >
-            <SlidersHorizontal size={12} />
-            <span>{showAdvanced ? 'Hide Advanced Sliders' : 'Advanced Numeric Controls'}</span>
-            {showAdvanced ? <ChevronDown size={13} /> : <ChevronUp size={13} />}
+            {isExpanded ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
           </button>
         </div>
 
-        {/* ── ADVANCED ACCORDION: Numeric Fallback Sliders (Collapsed by default) ── */}
-        <div
-          className={`
-            overflow-y-auto overscroll-contain transition-all duration-300
-            ${showAdvanced && drawerState === 'expanded' ? 'max-h-[45vh] opacity-100 p-4 border-t border-white/10' : 'max-h-0 opacity-0 overflow-hidden pointer-events-none p-0'}
-          `}
-          style={{ WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}
-        >
-          <div className="flex flex-col gap-4">
-            <div className="bg-white/5 p-3.5 rounded-2xl border border-white/10 flex flex-col gap-3">
-              <span className="text-xs font-semibold text-neutral-300">Exact Dimensions</span>
-              <GlassSliderRow
-                label="Width"
-                value={curtain.width}
-                min={CURTAIN_CONFIG.minWidth}
-                max={CURTAIN_CONFIG.maxWidth}
-                step={0.05}
-                unit=" m"
-                onChange={(v) => setCurtainTransform({ width: v })}
-              />
-              <GlassSliderRow
-                label="Height"
-                value={curtain.height}
-                min={CURTAIN_CONFIG.minHeight}
-                max={CURTAIN_CONFIG.maxHeight}
-                step={0.05}
-                unit=" m"
-                onChange={(v) => setCurtainTransform({ height: v })}
-              />
-              <GlassSliderRow
-                label="Rotation"
-                value={curtain.rotation || 0}
-                min={-45}
-                max={45}
-                step={1}
-                unit="°"
-                onChange={(v) => setCurtainTransform({ rotation: v })}
-              />
-            </div>
+        {/* ── COLLAPSED QUICK VIEW: Horizontal Fabric Thumbnails (Always 1-Tap Accessible) ── */}
+        {!isExpanded && (
+          <div className="px-4 pb-3 flex items-center gap-2.5 overflow-x-auto scrollbar-none touch-pan-x">
+            {/* Quick Add Fabric Button */}
+            <button
+              onClick={() => setShowFabricChoiceModal(true)}
+              style={{ touchAction: 'manipulation' }}
+              className="shrink-0 w-12 h-12 rounded-xl border border-dashed border-white/30 hover:border-amber-400 bg-white/5 hover:bg-white/10 flex flex-col items-center justify-center text-white/80 active:scale-95 transition"
+              title="Add Fabric"
+            >
+              <Plus size={18} className="text-amber-400" />
+            </button>
 
-            <div className="bg-white/5 p-3.5 rounded-2xl border border-white/10 flex flex-col gap-3">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-semibold text-neutral-300">Room Photo Pan &amp; Zoom</span>
+            {/* Quick Fabric Thumbnails */}
+            {openList.map((f) => {
+              const isSelected = currentSelected?.id === f.id;
+              return (
                 <button
-                  onClick={() => setBgOffset({ x: 0, y: 0, scale: 1 })}
-                  className="text-[11px] text-amber-400 hover:text-amber-300"
+                  key={f.id}
+                  onClick={() => {
+                    if (doubleLayerTarget === 'sheer' && selectedModel === 'double') {
+                      setSelectedSheerFabric(f);
+                    } else {
+                      setSelectedFabric(f);
+                    }
+                  }}
+                  style={{ touchAction: 'manipulation' }}
+                  className={`relative shrink-0 w-12 h-12 rounded-xl overflow-hidden border-2 transition active:scale-95 ${
+                    isSelected
+                      ? 'border-amber-400 ring-2 ring-amber-400/40 scale-105'
+                      : 'border-white/15 hover:border-white/40 opacity-80 hover:opacity-100'
+                  }`}
+                  title={f.name}
                 >
-                  Reset
+                  <img
+                    src={f.thumbnailUrl || f.imageUrl}
+                    alt={f.name}
+                    className="w-full h-full object-cover"
+                  />
+                  {isSelected && (
+                    <div className="absolute inset-0 bg-amber-400/20 flex items-center justify-center">
+                      <div className="w-4 h-4 rounded-full bg-amber-400 text-neutral-950 flex items-center justify-center">
+                        <Check size={10} strokeWidth={3} />
+                      </div>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* ── EXPANDED TAB CONTENT ── */}
+        {isExpanded && (
+          <div className="px-4 pt-1 pb-4 flex flex-col gap-3.5 max-h-[45vh] overflow-y-auto overscroll-contain animate-in fade-in duration-200">
+            {/* 1. FABRIC TAB */}
+            {activeTab === 'fabric' && (
+              <div className="flex flex-col gap-3">
+                {/* Double Layer Switcher: Front vs Sheer */}
+                {selectedModel === 'double' && (
+                  <div className="flex rounded-full bg-white/10 p-0.5 border border-white/10">
+                    <button
+                      onClick={() => setDoubleLayerTarget('front')}
+                      className={`flex-1 py-1 rounded-full text-xs font-semibold transition ${
+                        doubleLayerTarget === 'front'
+                          ? 'bg-amber-400 text-neutral-950 font-bold'
+                          : 'text-white/70 hover:text-white'
+                      }`}
+                    >
+                      Front Drape
+                    </button>
+                    <button
+                      onClick={() => setDoubleLayerTarget('sheer')}
+                      className={`flex-1 py-1 rounded-full text-xs font-semibold transition ${
+                        doubleLayerTarget === 'sheer'
+                          ? 'bg-amber-400 text-neutral-950 font-bold'
+                          : 'text-white/70 hover:text-white'
+                      }`}
+                    >
+                      Sheer Back
+                    </button>
+                  </div>
+                )}
+
+                {/* Horizontal Fabric Thumbnails */}
+                <div className="flex items-center gap-2.5 overflow-x-auto scrollbar-none py-1">
+                  <button
+                    onClick={() => setShowFabricChoiceModal(true)}
+                    style={{ touchAction: 'manipulation' }}
+                    className="shrink-0 w-14 h-14 rounded-2xl border-2 border-dashed border-white/30 hover:border-amber-400 bg-white/5 hover:bg-white/10 flex flex-col items-center justify-center text-white/80 active:scale-95 transition"
+                  >
+                    <Plus size={18} className="text-amber-400" />
+                    <span className="text-[10px] font-medium mt-0.5">Add</span>
+                  </button>
+
+                  {openList.map((f) => {
+                    const isSelected = currentSelected?.id === f.id;
+                    return (
+                      <button
+                        key={f.id}
+                        onClick={() => {
+                          if (doubleLayerTarget === 'sheer' && selectedModel === 'double') {
+                            setSelectedSheerFabric(f);
+                          } else {
+                            setSelectedFabric(f);
+                          }
+                        }}
+                        style={{ touchAction: 'manipulation' }}
+                        className={`group relative shrink-0 w-14 h-14 rounded-2xl overflow-hidden border-2 transition active:scale-95 ${
+                          isSelected
+                            ? 'border-amber-400 ring-2 ring-amber-400/40 scale-105'
+                            : 'border-white/15 hover:border-white/40 opacity-80 hover:opacity-100'
+                        }`}
+                        title={f.name}
+                      >
+                        <img
+                          src={f.thumbnailUrl || f.imageUrl}
+                          alt={f.name}
+                          className="w-full h-full object-cover"
+                        />
+                        {isSelected && (
+                          <div className="absolute inset-0 bg-amber-400/20 flex items-center justify-center">
+                            <div className="w-5 h-5 rounded-full bg-amber-400 text-neutral-950 flex items-center justify-center">
+                              <Check size={12} strokeWidth={3} />
+                            </div>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Simple Pattern Size Slider */}
+                <div className="bg-white/5 p-3 rounded-2xl border border-white/10 flex flex-col gap-1.5">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-neutral-300 font-medium">Pattern Size</span>
+                    <span className="text-amber-400 font-bold font-mono text-[11px]">
+                      {patternSizeValue === 1 ? 'Fine' : patternSizeValue === 5 ? 'Large' : 'Normal'}
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="5"
+                    step="1"
+                    value={patternSizeValue}
+                    onChange={(e) => handlePatternSizeChange(e.target.value)}
+                    style={{ touchAction: 'pan-x' }}
+                    className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                  />
+                  <div className="flex justify-between text-[10px] text-neutral-400">
+                    <span>Smaller</span>
+                    <span>Larger</span>
+                  </div>
+                </div>
+
+                {/* Separate Quick Actions: Capture & Upload Fabric */}
+                <div className="grid grid-cols-2 gap-2 pt-0.5">
+                  <button
+                    onClick={() => {
+                      if (/Mobi|Android|iPhone/i.test(navigator.userAgent)) {
+                        fabricCameraInputRef.current?.click();
+                      } else {
+                        setWebcamTarget('fabric');
+                        setShowWebcamModal(true);
+                      }
+                    }}
+                    style={{ touchAction: 'manipulation' }}
+                    className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 active:bg-white/20 text-white font-medium text-xs flex items-center justify-center gap-2 transition active:scale-95 border border-white/10"
+                  >
+                    <Camera size={15} className="text-amber-400" />
+                    <span>Capture Fabric</span>
+                  </button>
+                  <button
+                    onClick={() => fabricFileInputRef.current?.click()}
+                    style={{ touchAction: 'manipulation' }}
+                    className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 active:bg-white/20 text-white font-medium text-xs flex items-center justify-center gap-2 transition active:scale-95 border border-white/10"
+                  >
+                    <Upload size={15} className="text-white/80" />
+                    <span>Upload Fabric</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 2. OPEN / CLOSE TAB */}
+            {activeTab === 'openclose' && (
+              <div className="flex flex-col gap-3">
+                <div className="bg-white/5 p-3.5 rounded-2xl border border-white/10 flex flex-col gap-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-neutral-300 font-medium">Curtain Open State</span>
+                    <span className="text-amber-400 font-bold font-mono text-[11px]">
+                      {Math.round(animationState.openProgress * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value={Math.round(animationState.openProgress * 100)}
+                    onChange={(e) => handleScrubOpen(e.target.value)}
+                    style={{ touchAction: 'pan-x' }}
+                    className="w-full h-2.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                  />
+                  <div className="flex justify-between text-[10px] text-neutral-400">
+                    <span>Closed</span>
+                    <span>Half</span>
+                    <span>Fully Open</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleAnimateToggle(true)}
+                    style={{ touchAction: 'manipulation' }}
+                    className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition active:scale-95 border border-white/10"
+                  >
+                    <span>▶ Open Pleats</span>
+                  </button>
+                  <button
+                    onClick={() => handleAnimateToggle(false)}
+                    style={{ touchAction: 'manipulation' }}
+                    className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition active:scale-95 border border-white/10"
+                  >
+                    <span>⏸ Close Pleats</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 3. SIZE & ADJUST TAB */}
+            {activeTab === 'size' && (
+              <div className="flex flex-col gap-3">
+                <div className="bg-white/5 p-3 rounded-2xl border border-white/10 flex flex-col gap-2.5">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-neutral-300 font-medium">Curtain Width</span>
+                    <span className="text-amber-400 font-bold font-mono text-[11px]">
+                      {curtain.width.toFixed(2)} m
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={CURTAIN_CONFIG.minWidth}
+                    max={CURTAIN_CONFIG.maxWidth}
+                    step={0.05}
+                    value={curtain.width}
+                    onChange={(e) => setCurtainTransform({ width: parseFloat(e.target.value) })}
+                    style={{ touchAction: 'pan-x' }}
+                    className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                  />
+                </div>
+
+                <div className="bg-white/5 p-3 rounded-2xl border border-white/10 flex flex-col gap-2.5">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-neutral-300 font-medium">Curtain Height</span>
+                    <span className="text-amber-400 font-bold font-mono text-[11px]">
+                      {curtain.height.toFixed(2)} m
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={CURTAIN_CONFIG.minHeight}
+                    max={CURTAIN_CONFIG.maxHeight}
+                    step={0.05}
+                    value={curtain.height}
+                    onChange={(e) => setCurtainTransform({ height: parseFloat(e.target.value) })}
+                    style={{ touchAction: 'pan-x' }}
+                    className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                  />
+                </div>
+
+                <button
+                  onClick={resetCurtainTransform}
+                  style={{ touchAction: 'manipulation' }}
+                  className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-white/90 font-medium text-xs flex items-center justify-center gap-1.5 transition active:scale-95 border border-white/10"
+                >
+                  <RotateCcw size={14} />
+                  <span>Reset Size &amp; Position</span>
                 </button>
               </div>
-              <GlassSliderRow
-                label="Horizontal Pan"
-                value={bgOffset.x}
-                min={-50}
-                max={50}
-                step={1}
-                unit="%"
-                onChange={(v) => setBgOffset({ x: v })}
-              />
-              <GlassSliderRow
-                label="Vertical Pan"
-                value={bgOffset.y}
-                min={-50}
-                max={50}
-                step={1}
-                unit="%"
-                onChange={(v) => setBgOffset({ y: v })}
-              />
-              <GlassSliderRow
-                label="Zoom Level"
-                value={bgOffset.scale}
-                min={0.5}
-                max={3.0}
-                step={0.05}
-                display={`${bgOffset.scale.toFixed(2)}×`}
-                onChange={(v) => setBgOffset({ scale: v })}
-              />
-            </div>
-          </div>
-        </div>
+            )}
 
-        {/* Safe-Area Bottom Inset Pad for Gesture Bar */}
+            {/* 4. ROOM TAB */}
+            {activeTab === 'room' && (
+              <div className="flex flex-col gap-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      if (/Mobi|Android|iPhone/i.test(navigator.userAgent)) {
+                        roomCameraInputRef.current?.click();
+                      } else {
+                        setWebcamTarget('room');
+                        setShowWebcamModal(true);
+                      }
+                    }}
+                    style={{ touchAction: 'manipulation' }}
+                    className="py-3 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium text-xs flex items-center justify-center gap-2 transition active:scale-95 border border-white/10"
+                  >
+                    <Camera size={16} className="text-amber-400" />
+                    <span>Capture Room</span>
+                  </button>
+                  <button
+                    onClick={() => roomFileInputRef.current?.click()}
+                    style={{ touchAction: 'manipulation' }}
+                    className="py-3 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium text-xs flex items-center justify-center gap-2 transition active:scale-95 border border-white/10"
+                  >
+                    <Upload size={16} className="text-white/80" />
+                    <span>Upload Room</span>
+                  </button>
+                </div>
+
+                <div className="bg-white/5 p-3 rounded-2xl border border-white/10 flex flex-col gap-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-neutral-300 font-medium">Room Photo Zoom</span>
+                    <span className="text-amber-400 font-mono text-[11px] font-bold">
+                      {bgOffset.scale.toFixed(2)}×
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="3.0"
+                    step="0.05"
+                    value={bgOffset.scale}
+                    onChange={(e) => setBgOffset({ scale: parseFloat(e.target.value) })}
+                    style={{ touchAction: 'pan-x' }}
+                    className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                  />
+                  <div className="flex justify-between pt-1">
+                    <button
+                      onClick={() => setBgOffset({ x: 0, y: 0, scale: 1 })}
+                      className="text-[11px] text-amber-400 hover:text-amber-300 font-medium"
+                    >
+                      Reset Room Zoom
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Safe-Area Bottom Inset Pad for Home Indicator / Gesture Bar */}
         <div
           style={{
-            height: 'max(env(safe-area-inset-bottom, 0px), 16px)',
+            height: 'max(env(safe-area-inset-bottom, 0px), 12px)',
             flexShrink: 0
           }}
         />
       </div>
+
+      {/* ── SEPARATE ADD FABRIC OPTIONS MODAL ── */}
+      {showFabricChoiceModal && (
+        <div
+          onClick={() => setShowFabricChoiceModal(false)}
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-xs bg-neutral-900 border border-white/15 rounded-3xl p-5 shadow-2xl text-white flex flex-col gap-3.5"
+          >
+            <div className="flex justify-between items-center border-b border-white/10 pb-2">
+              <span className="text-sm font-bold">Add Custom Fabric</span>
+              <button
+                onClick={() => setShowFabricChoiceModal(false)}
+                className="p-1 rounded-full text-white/60 hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-2.5 pt-1">
+              {/* Option 1: Capture Fabric */}
+              <button
+                onClick={() => {
+                  setShowFabricChoiceModal(false);
+                  if (/Mobi|Android|iPhone/i.test(navigator.userAgent)) {
+                    fabricCameraInputRef.current?.click();
+                  } else {
+                    setWebcamTarget('fabric');
+                    setShowWebcamModal(true);
+                  }
+                }}
+                className="w-full py-3 px-4 rounded-2xl bg-amber-400 hover:bg-amber-300 text-neutral-950 font-bold text-xs flex items-center justify-center gap-2 transition active:scale-95 shadow-md"
+              >
+                <Camera size={17} />
+                <span>Capture Fabric Sample</span>
+              </button>
+
+              {/* Option 2: Upload Fabric */}
+              <button
+                onClick={() => {
+                  setShowFabricChoiceModal(false);
+                  fabricFileInputRef.current?.click();
+                }}
+                className="w-full py-3 px-4 rounded-2xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs flex items-center justify-center gap-2 transition active:scale-95 border border-white/15"
+              >
+                <Upload size={17} />
+                <span>Upload Fabric File</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Camera Capture Modal (Desktop WebRTC fallback) */}
+      {showWebcamModal && (
+        <CameraCapture
+          title={webcamTarget === 'fabric' ? 'Capture Fabric Sample' : 'Capture Room Photo'}
+          onCapture={async (dataUrl) => {
+            setShowWebcamModal(false);
+            const blob = await (await fetch(dataUrl)).blob();
+            const file = new File([blob], `${webcamTarget}_${Date.now()}.jpg`, { type: 'image/jpeg' });
+            if (webcamTarget === 'fabric') {
+              handleFabricFile(file);
+            } else {
+              handleRoomFile(file);
+            }
+          }}
+          onClose={() => setShowWebcamModal(false)}
+        />
+      )}
+
+      {/* Export Preview Modal */}
+      <ExportModal />
     </div>
   );
 }

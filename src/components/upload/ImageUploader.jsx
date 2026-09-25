@@ -73,7 +73,6 @@ export function ImageUploader() {
             height: json.data.height,
             isSample: false
           });
-          showToast('Room photo loaded successfully!', 'success');
           return;
         }
       }
@@ -87,7 +86,6 @@ export function ImageUploader() {
         height,
         isSample: false
       });
-      showToast('Room photo loaded!', 'success');
     } catch (err) {
       console.warn('Image processing fallback:', err);
       const localUrl = URL.createObjectURL(file);
@@ -98,7 +96,6 @@ export function ImageUploader() {
         height: 1080,
         isSample: false
       });
-      showToast('Room photo loaded locally!', 'info');
     } finally {
       setIsUploading(false);
     }

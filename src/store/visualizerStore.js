@@ -19,6 +19,9 @@ export const useVisualizerStore = create((set, get) => ({
   // Active curtain model: 'single' | 'double'
   selectedModel: 'single',
 
+  // 3D Curtain Selection state (controls subtle 3D rim glow)
+  isCurtainSelected: false,
+
   // Active gesture target layer: 'curtain' | 'photo'
   selectedLayer: 'curtain',
 
@@ -74,6 +77,8 @@ export const useVisualizerStore = create((set, get) => ({
     set({ selectedModel });
     get().saveToLocalStorage();
   },
+
+  setIsCurtainSelected: (isCurtainSelected) => set({ isCurtainSelected }),
 
   setSelectedLayer: (selectedLayer) => set({ selectedLayer }),
 
