@@ -640,11 +640,21 @@ export function CleanLayout() {
             {/* 2. OPEN / CLOSE TAB */}
             {activeTab === 'openclose' && (
               <div className="flex flex-col gap-3">
+                {/* Contextual state label */}
                 <div className="bg-white/5 p-3.5 rounded-2xl border border-white/10 flex flex-col gap-2">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-neutral-300 font-medium">Curtain Open State</span>
+                    <span className="text-neutral-300 font-medium">
+                      {selectedModel === 'double' ? 'Tie-Back / Release' : 'Curtain Open State'}
+                    </span>
                     <span className="text-amber-400 font-bold font-mono text-[11px]">
-                      {Math.round(animationState.openProgress * 100)}%
+                      {selectedModel === 'double'
+                        ? (animationState.openProgress >= 0.9
+                            ? 'Tied Back'
+                            : animationState.openProgress <= 0.1
+                              ? 'Closed'
+                              : 'Releasing…')
+                        : `${Math.round(animationState.openProgress * 100)}%`
+                      }
                     </span>
                   </div>
                   <input
@@ -658,9 +668,19 @@ export function CleanLayout() {
                     className="w-full h-2.5 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
                   />
                   <div className="flex justify-between text-[10px] text-neutral-400">
-                    <span>Closed</span>
-                    <span>Half</span>
-                    <span>Fully Open</span>
+                    {selectedModel === 'double' ? (
+                      <>
+                        <span>↓ Closed</span>
+                        <span>Releasing</span>
+                        <span>🪢 Tied Back</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Closed</span>
+                        <span>Half</span>
+                        <span>Fully Open</span>
+                      </>
+                    )}
                   </div>
                 </div>
 
@@ -670,14 +690,14 @@ export function CleanLayout() {
                     style={{ touchAction: 'manipulation' }}
                     className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition active:scale-95 border border-white/10"
                   >
-                    <span>▶ Open Pleats</span>
+                    <span>{selectedModel === 'double' ? '🪢 Tie Back' : '▶ Open Pleats'}</span>
                   </button>
                   <button
                     onClick={() => handleAnimateToggle(false)}
                     style={{ touchAction: 'manipulation' }}
                     className="py-2.5 px-3 rounded-xl bg-white/10 hover:bg-white/15 text-white font-medium text-xs flex items-center justify-center gap-1.5 transition active:scale-95 border border-white/10"
                   >
-                    <span>⏸ Close Pleats</span>
+                    <span>{selectedModel === 'double' ? '↓ Release & Close' : '⏸ Close Pleats'}</span>
                   </button>
                 </div>
               </div>

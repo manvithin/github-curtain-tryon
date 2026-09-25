@@ -6,6 +6,7 @@ import { useCurtainModel } from '../../hooks/useCurtainModel.js';
 import { useFabricTexture } from '../../hooks/useFabricTexture.js';
 import { useCurtainTransform } from '../../hooks/useCurtainTransform.js';
 import { useCurtainAnimation } from '../../hooks/useCurtainAnimation.js';
+import { useDoubleCurtainAnimation } from '../../hooks/useDoubleCurtainAnimation.js';
 
 /**
  * CurtainModel — Renders the active curtain GLB with direct manipulation
@@ -80,8 +81,11 @@ export function CurtainModel() {
   // ── Direct Touch Gesture Interactions (1-finger drag, 2-finger resize/twist, double-tap) ──
   useCurtainTransform(groupRef, baseDimensions);
 
-  // ── Play open / close pleat animations ──────────────────────────────────────
+  // ── Play open / close pleat animations (single curtain morph targets) ────────
   useCurtainAnimation(scene, animations);
+
+  // ── Double-curtain tie-back ↔ release animation (positional, no morph targets) ──
+  useDoubleCurtainAnimation(scene, selectedModel);
 
   return (
     <>
