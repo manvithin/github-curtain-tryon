@@ -19,13 +19,16 @@ const BOUNDS = {
 /**
  * useCurtainTransform — Pure Direct Manipulation Touch Gestures.
  *
- * 1. Two-finger touch → selects curtain → subtle 3D rim glow
- * 2. Two fingers moving horizontally apart/together → increases/decreases WIDTH
- * 3. Two fingers moving vertically apart/together → increases/decreases HEIGHT
- * 4. Two-finger twist → rotates curtain
- * 5. One-finger drag → moves curtain position
- * 6. Double tap → smoothly opens/closes curtain
- * 7. Tap outside → deselects curtain
+ * Supported Touch Gestures:
+ * 1. ONE FINGER: Move/position the curtain.
+ * 2. TWO FINGERS HORIZONTALLY: Adjust WIDTH only.
+ * 3. TWO FINGERS VERTICALLY: Adjust HEIGHT only.
+ * 4. TWO FINGER TOUCH: Selects curtain (subtle 3D rim glow).
+ * 5. DOUBLE TAP: Smoothly toggles open/close curtain pleats.
+ * 6. TAP OUTSIDE: Deselects curtain.
+ *
+ * NOTE: ROTATION IS COMPLETELY REMOVED FROM ALL GESTURES.
+ * Finger twists are 100% ignored. Rotation is only controlled via the UI slider.
  */
 export function useCurtainTransform(groupRef, baseDimensions) {
   const { camera, gl } = useThree();
@@ -56,14 +59,12 @@ export function useCurtainTransform(groupRef, baseDimensions) {
     rotation: curtain.rotation || 0
   });
 
-  // Pinch / Twist start refs
+  // Pinch start refs (horizontal distX for width, vertical distY for height)
   const pinchStartRef = useRef({
     distX: 0,
     distY: 0,
-    angle: 0,
     startWidth: curtain.width,
-    startHeight: curtain.height,
-    startRotation: curtain.rotation || 0
+    startHeight: curtain.height
   });
 
   // Double tap detection refs
@@ -87,13 +88,13 @@ export function useCurtainTransform(groupRef, baseDimensions) {
   // 2. Sync position & rotation from state
   useEffect(() => {
     if (!groupRef.current) return;
+    currentTransformRef.current.rotation = curtain.rotation || 0;
+    groupRef.current.rotation.z = (curtain.rotation || 0) * (Math.PI / 180);
+
     if (!isDraggingRef.current && !isPinchingRef.current) {
       currentTransformRef.current.x = curtain.positionX;
       currentTransformRef.current.y = curtain.positionY;
-      currentTransformRef.current.rotation = curtain.rotation || 0;
-
       groupRef.current.position.set(curtain.positionX, curtain.positionY, PLANE_Z);
-      groupRef.current.rotation.z = (curtain.rotation || 0) * (Math.PI / 180);
     }
   }, [curtain.positionX, curtain.positionY, curtain.rotation, groupRef]);
 
@@ -227,7 +228,7 @@ export function useCurtainTransform(groupRef, baseDimensions) {
       }
     };
 
-    // Pointer Move (1-Finger Drag)
+    // Pointer Move (1-Finger Drag -> Move Position Only)
     const onPointerMove = (e) => {
       if (!isDraggingRef.current || !groupRef.current) return;
       if (e.isPrimary === false) return;
@@ -269,7 +270,7 @@ export function useCurtainTransform(groupRef, baseDimensions) {
       }
     };
 
-    // ── 2-Finger Touch: Selects Curtain & Direct Resize / Twist ──────────────
+    // ── 2-Finger Touch: Selects Curtain & Direct Width/Height Adjustment Only ──
     const onTouchStart = (e) => {
       if (e.touches.length === 2) {
         // Two-finger touch selects curtain and activates subtle 3D rim glow
@@ -285,15 +286,12 @@ export function useCurtainTransform(groupRef, baseDimensions) {
 
         const dx = Math.abs(t2.clientX - t1.clientX);
         const dy = Math.abs(t2.clientY - t1.clientY);
-        const angle = Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * (180 / Math.PI);
 
         pinchStartRef.current = {
-          distX: Math.max(dx, 15),
-          distY: Math.max(dy, 15),
-          angle,
+          distX: Math.max(dx, 20),
+          distY: Math.max(dy, 20),
           startWidth: currentTransformRef.current.width,
-          startHeight: currentTransformRef.current.height,
-          startRotation: currentTransformRef.current.rotation
+          startHeight: currentTransformRef.current.height
         };
       }
     };
@@ -308,41 +306,29 @@ export function useCurtainTransform(groupRef, baseDimensions) {
 
       const currentDx = Math.abs(t2.clientX - t1.clientX);
       const currentDy = Math.abs(t2.clientY - t1.clientY);
-      const currentAngle = Math.atan2(t2.clientY - t1.clientY, t2.clientX - t1.clientX) * (180 / Math.PI);
 
-      const { distX, distY, angle, startWidth, startHeight, startRotation } = pinchStartRef.current;
+      const { distX, distY, startWidth, startHeight } = pinchStartRef.current;
 
-      // Two fingers moving horizontally apart/together → changes WIDTH
+      // Two fingers moving horizontally apart/together → changes WIDTH only
       const scaleXRatio = currentDx / distX;
       let newW = startWidth * scaleXRatio;
       newW = Math.max(BOUNDS.minWidth, Math.min(BOUNDS.maxWidth, newW));
 
-      // Two fingers moving vertically apart/together → changes HEIGHT
+      // Two fingers moving vertically apart/together → changes HEIGHT only
       const scaleYRatio = currentDy / distY;
       let newH = startHeight * scaleYRatio;
       newH = Math.max(BOUNDS.minHeight, Math.min(BOUNDS.maxHeight, newH));
 
-      // Two-finger twist → rotates curtain
-      let angleDelta = currentAngle - angle;
-      if (angleDelta > 180) angleDelta -= 360;
-      if (angleDelta < -180) angleDelta += 360;
-
-      let newRot = startRotation;
-      if (Math.abs(angleDelta) > 3) {
-        newRot = (startRotation + angleDelta) % 360;
-      }
-
+      // ROTATION IS NEVER MODIFIED HERE. Finger twist is 100% ignored.
       // Direct Three.js ref mutation at 60fps
       const { scaleX, scaleY, scaleZ } = calculateCurtainScale(baseDimensions, {
         width: newW,
         height: newH
       });
       groupRef.current.scale.set(scaleX, scaleY, scaleZ);
-      groupRef.current.rotation.z = newRot * (Math.PI / 180);
 
       currentTransformRef.current.width = newW;
       currentTransformRef.current.height = newH;
-      currentTransformRef.current.rotation = newRot;
     };
 
     const onTouchEnd = () => {
@@ -350,11 +336,10 @@ export function useCurtainTransform(groupRef, baseDimensions) {
         isPinchingRef.current = false;
         setIsTransforming(false);
 
-        // Commit final width, height, rotation ONCE to Zustand store
+        // Commit final width and height ONCE to Zustand store. Rotation is NOT touched!
         setCurtainTransform({
           width: parseFloat(currentTransformRef.current.width.toFixed(2)),
-          height: parseFloat(currentTransformRef.current.height.toFixed(2)),
-          rotation: parseFloat(currentTransformRef.current.rotation.toFixed(1))
+          height: parseFloat(currentTransformRef.current.height.toFixed(2))
         });
       }
     };

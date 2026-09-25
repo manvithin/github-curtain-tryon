@@ -296,6 +296,15 @@ export function CleanLayout() {
         </div>
       </div>
 
+      {/* ── RUAM WATERMARK (Top Right Corner, subtle brand watermark, non-blocking) ── */}
+      <div className="fixed top-[max(env(safe-area-inset-top,0px),12px)] right-4 z-25 pointer-events-none select-none">
+        <img
+          src="/RUAM_WATERMARK.png"
+          alt="RUAM"
+          className="h-9 w-auto object-contain opacity-80 drop-shadow-[0_2px_10px_rgba(0,0,0,0.6)]"
+        />
+      </div>
+
       {/* ── MINIMAL TOP BAR: Floating & Translucent ── */}
       <header className="absolute top-0 left-0 right-0 z-30 pointer-events-none pt-[max(env(safe-area-inset-top,0px),12px)] px-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
@@ -336,16 +345,18 @@ export function CleanLayout() {
             </button>
           </div>
 
-          {/* Save Preview Button */}
-          <button
-            onClick={handleExport}
-            style={{ touchAction: 'manipulation' }}
-            className="pointer-events-auto h-10 px-3.5 rounded-full bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-neutral-950 font-bold shadow-md flex items-center gap-1.5 transition active:scale-95 text-xs"
-            title="Save Image Preview"
-          >
-            <Download size={15} />
-            <span>Save</span>
-          </button>
+          {/* Save Preview Button (Comfortably spaced beside watermark) */}
+          <div className="pointer-events-auto flex items-center pr-12 sm:pr-14">
+            <button
+              onClick={handleExport}
+              style={{ touchAction: 'manipulation' }}
+              className="h-10 px-3.5 rounded-full bg-amber-400 hover:bg-amber-300 active:bg-amber-500 text-neutral-950 font-bold shadow-md flex items-center gap-1.5 transition active:scale-95 text-xs"
+              title="Save Image Preview"
+            >
+              <Download size={15} />
+              <span>Save</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -711,6 +722,41 @@ export function CleanLayout() {
                     style={{ touchAction: 'pan-x' }}
                     className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
                   />
+                </div>
+
+                {/* Manual Rotation Slider (-45° → 0° → +45°) */}
+                <div className="bg-white/5 p-3 rounded-2xl border border-white/10 flex flex-col gap-2.5">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="text-neutral-300 font-medium">Rotation</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-amber-400 font-bold font-mono text-[11px]">
+                        {Math.round(curtain.rotation || 0)}°
+                      </span>
+                      {Math.round(curtain.rotation || 0) !== 0 && (
+                        <button
+                          onClick={() => setCurtainTransform({ rotation: 0 })}
+                          className="text-[10px] text-white/50 hover:text-white px-1.5 py-0.5 rounded bg-white/10"
+                        >
+                          Reset 0°
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <input
+                    type="range"
+                    min="-45"
+                    max="45"
+                    step="1"
+                    value={Math.round(curtain.rotation || 0)}
+                    onChange={(e) => setCurtainTransform({ rotation: parseFloat(e.target.value) })}
+                    style={{ touchAction: 'pan-x' }}
+                    className="w-full h-2 bg-white/20 rounded-lg appearance-none cursor-pointer accent-amber-400"
+                  />
+                  <div className="flex justify-between text-[10px] text-neutral-400">
+                    <span>-45°</span>
+                    <span>0°</span>
+                    <span>+45°</span>
+                  </div>
                 </div>
 
                 <button
