@@ -70,8 +70,12 @@ export function useCurtainTransform(groupRef, baseDimensions) {
     const canvas = gl.domElement;
 
     const onPointerDown = (e) => {
-      // Only drag on left click or single touch
+      // Only drag on left click or single touch (ignore secondary touches during pinch)
       if (e.button !== undefined && e.button !== 0) return;
+      if (e.isPrimary === false) {
+        isDraggingRef.current = false;
+        return;
+      }
       if (!groupRef.current) return;
 
       const hit = getPlaneIntersection(e.clientX, e.clientY);
@@ -92,6 +96,7 @@ export function useCurtainTransform(groupRef, baseDimensions) {
 
     const onPointerMove = (e) => {
       if (!isDraggingRef.current || !groupRef.current) return;
+      if (e.isPrimary === false) return;
 
       const hit = getPlaneIntersection(e.clientX, e.clientY);
       if (!hit) return;

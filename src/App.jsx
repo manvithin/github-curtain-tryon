@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useVisualizerStore } from './store/visualizerStore.js';
 import { ImageUploader } from './components/upload/ImageUploader.jsx';
-import { Visualizer } from './components/visualizer/Visualizer.jsx';
+// Clean canvas-first layout with glassmorphic bottom drawer:
+import { CleanLayout as Visualizer } from './components/visualizer/CleanLayout.jsx';
+// To switch back to original classic layout, uncomment below:
+// import { Visualizer } from './components/visualizer/Visualizer.jsx';
 import { Toast } from './components/ui/Toast.jsx';
 import { isWebGLAvailable, WebGLFallback } from './components/ui/WebGLFallback.jsx';
 
